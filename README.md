@@ -150,10 +150,37 @@ Each bot runs a small state machine (patrol → engage → hunt) over:
 - **Combat** — burst discipline, weapon-appropriate engagement ranges,
   strafing, crouching, cover use, and reloading when disengaged.
 
-Four skill tiers (`easy` / `normal` / `hard` / `elite`) scale reaction time,
-aim jitter, turn rate, field of view, burst length and headshot preference.
-Set the tier with the `BOT_SKILL` var in `wrangler.jsonc`; `TARGET_PLAYERS`
-controls how full a room is kept.
+### Tuning them
+
+Set the tier with `BOT_SKILL` in `wrangler.jsonc` (`easy` / `normal` / `hard` /
+`elite`); `TARGET_PLAYERS` controls how full a room is kept. The tiers measure
+out roughly like this over a 10-bot deathmatch:
+
+| tier | kills/min | headshot % of kills |
+| --- | --- | --- |
+| easy | 14 | 14% |
+| normal | 37 | 29% |
+| hard | 43 | 45% |
+| elite | 57 | 68% |
+
+If a tier is not to taste, the numbers live in `PROFILES` in `src/game/bot.ts`.
+In rough order of how much they matter:
+
+| parameter | effect |
+| --- | --- |
+| `aimJitter` | angular aim error in radians — the biggest single lever. 0.05 is about a metre off at 20 m |
+| `aimHeight` | where on the body they aim, as a fraction of hull height. Low values keep a wide error cone off the head |
+| `headshotBias` | how often they deliberately go for the head. A headshot is 4x, so this dominates time-to-kill |
+| `reactionMinMs` / `reactionMaxMs` | delay between acquiring you and being allowed to fire |
+| `visionRange`, `fovCos` | how far and how wide they notice you at all — the lever on how *often* you get fought |
+| `burstMin` / `burstMax`, `burstPause*` | how long they hold the trigger, and how long they leave you alone afterwards |
+| `turnSpeed` / `snapSpeed` | how fast they can swing onto you |
+
+`tests/bot-difficulty.test.ts` runs a headless match per tier and asserts the
+ladder stays monotonic, so a tuning change that accidentally makes `easy`
+deadlier than `elite` fails the suite. That is not hypothetical — it is exactly
+what happened when `aimJitter` was applied as a per-tick random walk that the
+tracking term cancelled on the same tick.
 
 ## Gameplay
 

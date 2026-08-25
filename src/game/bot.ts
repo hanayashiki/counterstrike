@@ -24,6 +24,7 @@ import {
   distance,
   distance2D,
   vec3,
+  wrapAngle,
 } from '../shared/math';
 import type { InputCommand } from '../shared/protocol';
 import { WeaponId } from '../shared/weapons';
@@ -34,7 +35,12 @@ interface SkillProfile {
   /** Delay between seeing a target and being allowed to shoot. */
   reactionMinMs: number;
   reactionMaxMs: number;
-  /** Standard deviation of the aim error cone, in radians. */
+  /**
+   * Standard deviation of the bot's aim error, in radians. This is a real
+   * angular offset held on top of the tracked angle, so it translates directly
+   * into how far shots land from the target: 0.05 rad is about a metre off at
+   * 20 m. It is the single biggest lever on how deadly a bot feels.
+   */
   aimJitter: number;
   /** Maximum turn rate while tracking, in radians per second. */
   turnSpeed: number;
@@ -46,8 +52,14 @@ interface SkillProfile {
   burstPauseMaxMs: number;
   visionRange: number;
   fovCos: number;
-  /** Probability per decision of aiming for the head instead of the chest. */
+  /** Probability per decision of aiming for the head instead of the body. */
   headshotBias: number;
+  /**
+   * Where on the target the bot aims, as a fraction of hull height. Weak bots
+   * aim at the belly: with a wide error cone, aiming centre-mass scatters shots
+   * onto the head, and a 4x headshot turns a stray round into an instant kill.
+   */
+  aimHeight: number;
   /** Probability of strafing while engaged. */
   strafeChance: number;
   /** Chance to hold still (better accuracy) while shooting. */
@@ -59,73 +71,79 @@ interface SkillProfile {
 }
 
 const PROFILES: Record<BotSkill, SkillProfile> = {
+  // Deliberately forgiving: slow to notice you, slow to swing, and shooting at
+  // a target roughly two metres wide at twenty paces.
   easy: {
-    reactionMinMs: 380,
-    reactionMaxMs: 640,
-    aimJitter: 0.055,
-    turnSpeed: 3.2,
-    snapSpeed: 5,
-    burstMin: 2,
-    burstMax: 4,
-    burstPauseMinMs: 400,
-    burstPauseMaxMs: 900,
-    visionRange: 42,
-    fovCos: Math.cos((100 * Math.PI) / 180 / 2),
-    headshotBias: 0.05,
-    strafeChance: 0.25,
-    disciplineChance: 0.3,
+    reactionMinMs: 700,
+    reactionMaxMs: 1200,
+    aimJitter: 0.14,
+    turnSpeed: 1.9,
+    snapSpeed: 2.8,
+    burstMin: 1,
+    burstMax: 2,
+    burstPauseMinMs: 900,
+    burstPauseMaxMs: 1800,
+    visionRange: 24,
+    fovCos: Math.cos((70 * Math.PI) / 180 / 2),
+    headshotBias: 0.005,
+    aimHeight: 0.5,
+    strafeChance: 0.18,
+    disciplineChance: 0.15,
     reloadAt: 0.15,
-    crouchChance: 0.1,
+    crouchChance: 0.04,
   },
   normal: {
-    reactionMinMs: 220,
-    reactionMaxMs: 380,
-    aimJitter: 0.03,
-    turnSpeed: 5.2,
-    snapSpeed: 8,
+    reactionMinMs: 260,
+    reactionMaxMs: 430,
+    aimJitter: 0.045,
+    turnSpeed: 4.6,
+    snapSpeed: 7,
     burstMin: 3,
-    burstMax: 6,
-    burstPauseMinMs: 260,
-    burstPauseMaxMs: 560,
-    visionRange: 58,
-    fovCos: Math.cos((120 * Math.PI) / 180 / 2),
-    headshotBias: 0.14,
+    burstMax: 5,
+    burstPauseMinMs: 320,
+    burstPauseMaxMs: 650,
+    visionRange: 48,
+    fovCos: Math.cos((110 * Math.PI) / 180 / 2),
+    headshotBias: 0.08,
+    aimHeight: 0.62,
     strafeChance: 0.45,
-    disciplineChance: 0.5,
+    disciplineChance: 0.45,
     reloadAt: 0.2,
-    crouchChance: 0.2,
+    crouchChance: 0.18,
   },
   hard: {
-    reactionMinMs: 140,
-    reactionMaxMs: 240,
-    aimJitter: 0.017,
-    turnSpeed: 7.5,
-    snapSpeed: 12,
+    reactionMinMs: 150,
+    reactionMaxMs: 250,
+    aimJitter: 0.02,
+    turnSpeed: 7,
+    snapSpeed: 11,
     burstMin: 4,
     burstMax: 8,
-    burstPauseMinMs: 180,
-    burstPauseMaxMs: 380,
-    visionRange: 72,
-    fovCos: Math.cos((140 * Math.PI) / 180 / 2),
-    headshotBias: 0.28,
+    burstPauseMinMs: 200,
+    burstPauseMaxMs: 400,
+    visionRange: 66,
+    fovCos: Math.cos((135 * Math.PI) / 180 / 2),
+    headshotBias: 0.22,
+    aimHeight: 0.68,
     strafeChance: 0.6,
-    disciplineChance: 0.65,
+    disciplineChance: 0.62,
     reloadAt: 0.28,
     crouchChance: 0.28,
   },
   elite: {
     reactionMinMs: 90,
-    reactionMaxMs: 160,
-    aimJitter: 0.009,
+    reactionMaxMs: 155,
+    aimJitter: 0.008,
     turnSpeed: 10,
     snapSpeed: 16,
     burstMin: 5,
     burstMax: 10,
     burstPauseMinMs: 120,
     burstPauseMaxMs: 260,
-    visionRange: 90,
+    visionRange: 88,
     fovCos: Math.cos((160 * Math.PI) / 180 / 2),
-    headshotBias: 0.42,
+    headshotBias: 0.4,
+    aimHeight: 0.72,
     strafeChance: 0.7,
     disciplineChance: 0.75,
     reloadAt: 0.35,
@@ -140,6 +158,8 @@ const enum BotState {
 }
 
 const SENSE_INTERVAL_MS = 90;
+/** How often a bot re-rolls where its aim is sitting relative to the target. */
+const ERROR_ROLL_MS = 230;
 const REPATH_INTERVAL_MS = 1400;
 const STUCK_WINDOW_MS = 700;
 const STUCK_DISTANCE = 0.55;
@@ -152,8 +172,20 @@ export class BotController implements BotBrain {
   private seq = 0;
   private dtAccumulator = 0;
 
+  /** Where the bot is tracking. The command adds the aim error on top. */
   private aimYaw = 0;
   private aimPitch = 0;
+  /**
+   * Persistent aim error. Re-rolled a few times a second and eased toward, so
+   * a bot's aim drifts around the target the way a human's does instead of
+   * snapping to it. Adding noise directly to `aimYaw` does not work: the
+   * tracking term corrects it on the same tick.
+   */
+  private errorYaw = 0;
+  private errorPitch = 0;
+  private errorTargetYaw = 0;
+  private errorTargetPitch = 0;
+  private nextErrorRollMs = 0;
 
   private targetId = 0;
   private targetLastSeenMs = 0;
@@ -339,7 +371,7 @@ export class BotController implements BotBrain {
     const aimHeight =
       this.rng.next() < profile.headshotBias
         ? target.move.height - 0.16
-        : target.move.height * 0.68;
+        : target.move.height * profile.aimHeight;
     const aimPoint = vec3(
       target.move.pos.x + target.move.vel.x * lead,
       target.move.pos.y + aimHeight,
@@ -356,14 +388,17 @@ export class BotController implements BotBrain {
     this.aimYaw = approachAngle(this.aimYaw, desired.yaw, rate);
     this.aimPitch = approachAngle(this.aimPitch, desired.pitch, rate);
 
-    // Persistent jitter so bots miss like people do rather than laser-locking.
+    // Re-roll where the aim is sitting relative to the target, then ease toward
+    // it. Firing from the air is markedly worse.
     const jitter = profile.aimJitter * (me.move.onGround ? 1 : 1.8);
-    this.aimYaw += this.rng.gaussian() * jitter * dt * 6;
-    this.aimPitch = clamp(
-      this.aimPitch + this.rng.gaussian() * jitter * dt * 6,
-      -Math.PI / 2 + 0.01,
-      Math.PI / 2 - 0.01,
-    );
+    if (now >= this.nextErrorRollMs) {
+      this.nextErrorRollMs = now + ERROR_ROLL_MS;
+      this.errorTargetYaw = this.rng.gaussian() * jitter;
+      this.errorTargetPitch = this.rng.gaussian() * jitter * 0.7;
+    }
+    const settle = Math.min(1, dt * 8);
+    this.errorYaw += (this.errorTargetYaw - this.errorYaw) * settle;
+    this.errorPitch += (this.errorTargetPitch - this.errorPitch) * settle;
 
     const onTarget = yawError < 0.09 + profile.aimJitter * 4;
     const ready = now >= this.burstResumeMs;
@@ -545,6 +580,10 @@ export class BotController implements BotBrain {
     );
     this.aimYaw = approachAngle(this.aimYaw, desired.yaw, this.profile.turnSpeed * 0.8 * dt);
     this.aimPitch = approachAngle(this.aimPitch, 0, 2 * dt);
+    // No target, no aim error to hold.
+    const settle = Math.min(1, dt * 8);
+    this.errorYaw -= this.errorYaw * settle;
+    this.errorPitch -= this.errorPitch * settle;
   }
 
   // -------------------------------------------------------------------------
@@ -605,8 +644,8 @@ export class BotController implements BotBrain {
       seq: this.seq,
       dtMs,
       buttons,
-      yaw: this.aimYaw,
-      pitch: clamp(this.aimPitch, -Math.PI / 2 + 0.01, Math.PI / 2 - 0.01),
+      yaw: wrapAngle(this.aimYaw + this.errorYaw),
+      pitch: clamp(this.aimPitch + this.errorPitch, -Math.PI / 2 + 0.01, Math.PI / 2 - 0.01),
       moveX: clamp(moveX, -1, 1),
       moveZ: clamp(moveZ, -1, 1),
     };
