@@ -164,13 +164,27 @@ damage, spawn protection.
 | | |
 | --- | --- |
 | `WASD` | move |
-| `Space` / `Ctrl` / `Shift` | jump / crouch / walk |
+| `Space` / `Ctrl` or `C` / `Shift` | jump / crouch / walk |
+| `Q` / `E` | lean left / right |
 | `LMB` / `RMB` / `R` | fire / aim / reload |
 | `1` `2` | primary / sidearm |
 | `Tab` / `Y` / `Esc` | scoreboard / chat / release mouse |
 
 The crosshair gap is the actual spread cone projected onto the screen, so it
 shows exactly where bullets can land.
+
+**Leaning** is authoritative, not a camera trick. Holding `Q`/`E` slides the
+viewpoint up to 42 cm sideways past your hull, and the server applies the same
+offset when it traces your shots — so you really can clear a corner without
+stepping into it. Two things keep it honest: a probe stops the head leaning
+into geometry (the closer the wall, the less lean you get), and your torso
+visibly leans on everyone else's screen, so the sliver of body you bought
+yourself is a sliver they can shoot. Leaning also costs ~28% of your movement
+speed and is disabled in mid-air.
+
+**Scoped optics.** The LR-50's magnified sight swaps the viewmodel out for a
+scope overlay once you aim, rather than holding the weapon in front of the
+camera — otherwise the scope body would sit in the middle of the screen.
 
 ## Tooling
 

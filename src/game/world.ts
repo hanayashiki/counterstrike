@@ -14,13 +14,19 @@ import {
 import {
   ACCURATE_MOVE_SPEED,
   ARMOR_ABSORB,
+  BTN_ADS,
   BTN_ATTACK,
+  BTN_CROUCH,
+  BTN_LEAN_LEFT,
+  BTN_LEAN_RIGHT,
   BTN_RELOAD,
+  BTN_WALK,
   FALL_DAMAGE_PER_MS,
   FALL_DAMAGE_THRESHOLD,
   HEAD_HEIGHT,
   INTERP_DELAY_MS,
   MAX_HEALTH,
+  MAX_REPEATED_INPUT_TICKS,
   MAX_REWIND_MS,
   PLAYER_RADIUS,
   RESPAWN_DELAY_MS,
@@ -66,6 +72,13 @@ const MAX_COMMAND_DT_MS = 50;
 /** Damage share required to be credited with an assist. */
 const ASSIST_DAMAGE = 40;
 
+/**
+ * Buttons that describe a sustained pose rather than an action. Only these are
+ * carried over when input starves: repeating a fire or jump button would let a
+ * stalled client keep shooting and hopping.
+ */
+const HELD_BUTTONS = BTN_CROUCH | BTN_WALK | BTN_ADS | BTN_LEAN_LEFT | BTN_LEAN_RIGHT;
+
 export type BotSkill = 'easy' | 'normal' | 'hard' | 'elite';
 
 export interface WorldOptions {
@@ -86,6 +99,16 @@ const scratchDir = vec3();
 const scratchHitPoint = vec3();
 const scratchFrame: HistoryFrame = { timeMs: 0, x: 0, y: 0, z: 0, height: 0, alive: false };
 const scratchRay: RayHit = { t: 0, nx: 0, ny: 0, nz: 0, brush: null };
+/** Reused when input starves, so the hot path stays allocation-free. */
+const repeatCommand: InputCommand = {
+  seq: 0,
+  dtMs: 16,
+  buttons: 0,
+  yaw: 0,
+  pitch: 0,
+  moveX: 0,
+  moveZ: 0,
+};
 const scratchMove: MoveResult = {
   onGround: false,
   hitWall: false,
@@ -293,6 +316,7 @@ export class GameWorld {
     c.move.yaw = spawn.yaw;
     c.move.pitch = 0;
     c.move.crouching = false;
+    c.move.lean = 0;
     c.health = MAX_HEALTH;
     c.armor = START_ARMOR;
     c.alive = true;
@@ -415,11 +439,22 @@ export class GameWorld {
   private simulateCombatant(c: Combatant): void {
     const budget = Math.min(c.pendingInputs.length, MAX_COMMANDS_PER_TICK);
     if (budget === 0) {
-      // No input this tick: keep physics running so the player still falls.
+      // No input this tick. Keep physics running so the player still falls, and
+      // hold their last pose so a dropped packet does not read as "let go of
+      // everything" - see MAX_REPEATED_INPUT_TICKS.
       if (c.alive) {
+        const held = c.lastCommand;
+        const repeat = held !== null && c.starvedTicks < MAX_REPEATED_INPUT_TICKS;
+        repeatCommand.buttons = repeat && held ? held.buttons & HELD_BUTTONS : 0;
+        repeatCommand.yaw = held ? held.yaw : c.move.yaw;
+        repeatCommand.pitch = held ? held.pitch : c.move.pitch;
+        repeatCommand.moveX = repeat && held ? held.moveX : 0;
+        repeatCommand.moveZ = repeat && held ? held.moveZ : 0;
+        c.starvedTicks++;
+
         stepMovement(
           c.move,
-          { buttons: 0, yaw: c.move.yaw, pitch: c.move.pitch, moveX: 0, moveZ: 0 },
+          repeatCommand,
           this.map.brushes,
           TICK_DT,
           c.weaponDef.moveSpeedMultiplier,
@@ -431,8 +466,10 @@ export class GameWorld {
       return;
     }
 
+    c.starvedTicks = 0;
     for (let i = 0; i < budget; i++) {
       const cmd = c.pendingInputs.shift() as InputCommand;
+      c.lastCommand = cmd;
       c.lastProcessedSeq = Math.max(c.lastProcessedSeq, cmd.seq);
       const dt = Math.min(MAX_COMMAND_DT_MS, Math.max(1, cmd.dtMs)) / 1000;
 
@@ -791,6 +828,7 @@ export class GameWorld {
       local.reloadMs = Math.max(0, Math.round(viewer.reloadEndsAtMs - this.timeMs));
       local.spread = Math.min(65535, Math.round(this.currentSpread(viewer) * 10000));
       local.height = viewer.move.height;
+      local.lean = viewer.move.lean;
     }
 
     for (const c of this.combatants.values()) {
@@ -806,6 +844,7 @@ export class GameWorld {
         health: Math.max(0, Math.round(c.health)),
         weapon: c.weapon.weapon,
         heightCm: Math.round(c.move.height * 100),
+        lean: c.move.lean,
       } satisfies EntitySnapshot);
     }
 
@@ -867,6 +906,7 @@ export function emptySnapshot(): Snapshot {
     reloadMs: 0,
     spread: 0,
     height: 1.8,
+    lean: 0,
   };
   return { tick: 0, serverTimeMs: 0, ackSeq: 0, local, entities: [], events: [] };
 }

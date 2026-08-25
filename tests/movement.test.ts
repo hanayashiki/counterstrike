@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { type MoveResult, makeBrush } from '../src/shared/collision';
+import { type MoveResult, hullOverlapsWorld, makeBrush } from '../src/shared/collision';
 import {
   BTN_CROUCH,
   BTN_JUMP,
+  BTN_LEAN_LEFT,
+  BTN_LEAN_RIGHT,
   BTN_WALK,
+  LEAN_DISTANCE,
   MAX_AIR_WISH_SPEED,
   MAX_CROUCH_SPEED,
   MAX_GROUND_SPEED,
@@ -13,7 +16,13 @@ import {
   PLAYER_HEIGHT,
 } from '../src/shared/config';
 import { vec3 } from '../src/shared/math';
-import { type MoveInput, type MoveState, canStand, stepMovement } from '../src/shared/movement';
+import {
+  type MoveInput,
+  type MoveState,
+  canStand,
+  eyePosition,
+  stepMovement,
+} from '../src/shared/movement';
 
 const floor = [makeBrush(-60, -2, -60, 60, 0, 60)];
 const DT = 1 / 64;
@@ -26,6 +35,7 @@ const freshState = (): MoveState => ({
   onGround: true,
   crouching: false,
   height: PLAYER_HEIGHT,
+  lean: 0,
 });
 
 const input = (over: Partial<MoveInput> = {}): MoveInput => ({
@@ -227,4 +237,125 @@ test('replaying a prefix then the rest matches replaying it all at once', () => 
 
   assert.deepEqual(straightThrough.pos, inTwoHalves.pos);
   assert.deepEqual(straightThrough.vel, inTwoHalves.vel);
+});
+
+test('leaning eases in, tops out at full lean, and returns to centre', () => {
+  const state = freshState();
+  const result = out();
+  for (let i = 0; i < 64; i++) {
+    stepMovement(state, input({ buttons: BTN_LEAN_RIGHT }), floor, DT, 1, result);
+  }
+  assert.ok(Math.abs(state.lean - 1) < 0.001, `lean settled at ${state.lean}`);
+
+  for (let i = 0; i < 64; i++) stepMovement(state, input(), floor, DT, 1, result);
+  assert.equal(state.lean, 0, 'lean must return to centre when released');
+});
+
+test('leaning both ways at once cancels out', () => {
+  const state = freshState();
+  const result = out();
+  for (let i = 0; i < 32; i++) {
+    stepMovement(state, input({ buttons: BTN_LEAN_LEFT | BTN_LEAN_RIGHT }), floor, DT, 1, result);
+  }
+  assert.equal(state.lean, 0);
+});
+
+test('lean takes about a sixth of a second, not a frame', () => {
+  const state = freshState();
+  const result = out();
+  stepMovement(state, input({ buttons: BTN_LEAN_LEFT }), floor, DT, 1, result);
+  assert.ok(Math.abs(state.lean) < 0.2, `lean snapped to ${state.lean} in one tick`);
+  assert.ok(state.lean < 0, 'Q must lean left, i.e. negative');
+});
+
+test('a wall clamps the lean, and the closer it is the less you get', () => {
+  // Walls to the player's right at yaw = 0 (right is +X), at three distances.
+  const leanAgainst = (wallX: number): number => {
+    const world = [...floor, makeBrush(wallX, 0, -5, wallX + 4, 4, 5)];
+    const state = freshState();
+    const result = out();
+    for (let i = 0; i < 64; i++) {
+      stepMovement(state, input({ buttons: BTN_LEAN_RIGHT }), world, DT, 1, result);
+    }
+    // Whatever lean survived, the head must not be inside the wall.
+    const eye = eyePosition(vec3(), state);
+    assert.equal(
+      hullOverlapsWorld(eye.x, eye.y - 0.21, eye.z, 0.22, 0.42, world),
+      false,
+      `head clipped into the wall at lean ${state.lean}`,
+    );
+    return state.lean;
+  };
+
+  // The probe reaches LEAN_DISTANCE + LEAN_PROBE_RADIUS ~= 0.64 m at full
+  // lean, so only walls inside that range clamp anything.
+  const flush = leanAgainst(0.42);
+  const near = leanAgainst(0.55);
+  const clear = leanAgainst(2.5);
+
+  assert.ok(clear > 0.99, `should lean fully with no wall nearby, got ${clear}`);
+  assert.ok(near < clear, `a nearby wall should clamp the lean (${near} vs ${clear})`);
+  assert.ok(flush <= near, `a flush wall should clamp at least as hard (${flush} vs ${near})`);
+  assert.ok(flush < 0.6, `leaned ${flush} into a wall right beside us`);
+});
+
+test('leaning away from a wall is unaffected', () => {
+  const world = [...floor, makeBrush(0.42, 0, -5, 4, 4, 5)];
+  const state = freshState();
+  const result = out();
+  for (let i = 0; i < 64; i++) {
+    stepMovement(state, input({ buttons: BTN_LEAN_LEFT }), world, DT, 1, result);
+  }
+  assert.ok(Math.abs(state.lean - -1) < 0.001, `expected a full left lean, got ${state.lean}`);
+});
+
+test('you cannot lean in mid-air', () => {
+  const state = freshState();
+  const result = out();
+  for (let i = 0; i < 32; i++) {
+    stepMovement(state, input({ buttons: BTN_LEAN_RIGHT }), floor, DT, 1, result);
+  }
+  assert.ok(state.lean > 0.5, 'should be leaning on the ground first');
+
+  stepMovement(state, input({ buttons: BTN_JUMP | BTN_LEAN_RIGHT }), floor, DT, 1, result);
+  for (let i = 0; i < 20; i++) {
+    stepMovement(state, input({ buttons: BTN_LEAN_RIGHT }), floor, DT, 1, result);
+  }
+  assert.equal(state.onGround, false, 'still airborne');
+  assert.ok(state.lean < 0.2, `kept leaning ${state.lean} in the air`);
+});
+
+test('the eye moves sideways with the lean, and drops slightly', () => {
+  const state = freshState();
+  const upright = eyePosition(vec3(), state);
+  assert.equal(upright.x, 0);
+  assert.ok(Math.abs(upright.y - (PLAYER_HEIGHT - 0.15)) < 1e-9);
+
+  // yaw = 0 looks down -Z, so right is +X.
+  state.lean = 1;
+  const right = eyePosition(vec3(), state);
+  assert.ok(Math.abs(right.x - LEAN_DISTANCE) < 1e-9, `eye at x=${right.x}`);
+  assert.ok(Math.abs(right.z) < 1e-9);
+  assert.ok(right.y < upright.y, 'the head should dip when leaning');
+
+  state.lean = -1;
+  assert.ok(Math.abs(eyePosition(vec3(), state).x + LEAN_DISTANCE) < 1e-9);
+
+  // A quarter turn rotates the offset with the player.
+  state.yaw = Math.PI / 2;
+  state.lean = 1;
+  const turned = eyePosition(vec3(), state);
+  assert.ok(Math.abs(turned.x) < 1e-9, `x=${turned.x}`);
+  assert.ok(Math.abs(turned.z + LEAN_DISTANCE) < 1e-9, `z=${turned.z}`);
+});
+
+test('leaning slows you down', () => {
+  const upright = freshState();
+  run(upright, input({ moveZ: 1 }), 128);
+  const leaning = freshState();
+  run(leaning, input({ moveZ: 1, buttons: BTN_LEAN_RIGHT }), 128);
+  assert.ok(
+    Math.hypot(leaning.vel.x, leaning.vel.z) < Math.hypot(upright.vel.x, upright.vel.z) * 0.85,
+    'a leaning player should move slower',
+  );
 });

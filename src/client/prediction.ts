@@ -39,6 +39,7 @@ export class LocalPlayer {
     onGround: false,
     crouching: false,
     height: PLAYER_HEIGHT,
+    lean: 0,
   };
 
   readonly pending: InputCommand[] = [];
@@ -235,6 +236,7 @@ export class LocalPlayer {
     this.state.vel.y = local.vy;
     this.state.vel.z = local.vz;
     this.state.height = local.height;
+    this.state.lean = local.lean;
     this.state.crouching = (local.flags & (1 << 1)) !== 0;
     this.state.onGround = (local.flags & (1 << 6)) !== 0;
 
@@ -304,6 +306,7 @@ export class LocalPlayer {
     this.reloadEndsAtMs = 0;
     this.recoilPitch = 0;
     this.recoilYaw = 0;
+    this.state.lean = 0;
     this.errorOffset.x = 0;
     this.errorOffset.y = 0;
     this.errorOffset.z = 0;

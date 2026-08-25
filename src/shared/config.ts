@@ -13,6 +13,15 @@ export const SNAPSHOT_RATE = 32;
 /** Client input sends per second. */
 export const INPUT_RATE = 64;
 
+/**
+ * When no input arrives for a tick, the server re-applies the player's last
+ * held pose rather than an empty command - otherwise ordinary network jitter
+ * reads as "let go of every key", which would pop players out of a crouch,
+ * drop their aim, and un-lean them mid-peek. Capped so a client that actually
+ * stops talking comes to rest instead of running on forever.
+ */
+export const MAX_REPEATED_INPUT_TICKS = 8;
+
 /** How long the server keeps historical positions around for lag compensation. */
 export const LAG_COMP_HISTORY_MS = 1000;
 /** Hard cap on how far back a client may rewind the world (anti-cheat sanity). */
@@ -45,6 +54,30 @@ export const STEP_HEIGHT = 0.45;
 
 /** Speed below which the movement inaccuracy penalty disappears entirely. */
 export const ACCURATE_MOVE_SPEED = 1.6;
+
+// ---------------------------------------------------------------------------
+// Leaning
+//
+// Leaning slides the eye sideways past the hull so you can clear a corner
+// without stepping into it. Because the eye is where shots originate, this is
+// authoritative state, not a camera effect: the server applies the same offset
+// when it traces a bullet, and remote players visibly lean so the peek is
+// something opponents can actually see and shoot at.
+// ---------------------------------------------------------------------------
+
+/** Lateral eye travel at full lean, in metres. */
+export const LEAN_DISTANCE = 0.42;
+/** How much the head drops at full lean. */
+export const LEAN_DROP = 0.09;
+/** Camera roll at full lean, in radians (about 7 degrees). */
+export const LEAN_ROLL = 0.125;
+/** Lean units per second; a full lean takes ~1/6 s. */
+export const LEAN_RATE = 6;
+/** Probe used to stop the head leaning into geometry. */
+export const LEAN_PROBE_RADIUS = 0.22;
+export const LEAN_PROBE_HEIGHT = 0.42;
+/** Movement speed multiplier while leaning. */
+export const LEAN_SPEED_SCALE = 0.72;
 
 // ---------------------------------------------------------------------------
 // Combat
@@ -89,3 +122,5 @@ export const BTN_ATTACK = 1 << 6;
 export const BTN_RELOAD = 1 << 7;
 export const BTN_WALK = 1 << 8;
 export const BTN_ADS = 1 << 9;
+export const BTN_LEAN_LEFT = 1 << 10;
+export const BTN_LEAN_RIGHT = 1 << 11;

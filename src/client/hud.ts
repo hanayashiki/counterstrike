@@ -33,6 +33,7 @@ export class Hud {
   private readonly root = el('hud');
   private readonly crosshair = el('crosshair');
   private readonly hitmarker = el('hitmarker');
+  private readonly scope = el('scope');
   private readonly damageRing = el('damage-ring');
   private readonly health = el('health');
   private readonly healthBar = el('health-bar');
@@ -122,6 +123,15 @@ export class Hud {
     this.crosshair.style.setProperty('--ch-gap', `${gap.toFixed(1)}px`);
     this.crosshair.style.setProperty('--ch-len', `${(5 + gap * 0.12).toFixed(1)}px`);
     this.crosshair.classList.toggle('enemy', onEnemy);
+  }
+
+  /**
+   * Swap between the normal reticle and a scoped view. They are mutually
+   * exclusive: the scope has its own etched reticle.
+   */
+  setScoped(scoped: boolean): void {
+    this.scope.classList.toggle('hidden', !scoped);
+    this.crosshair.classList.toggle('hidden', scoped);
   }
 
   setScores(red: number, blue: number): void {

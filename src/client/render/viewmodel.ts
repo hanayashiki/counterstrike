@@ -13,6 +13,8 @@ const HIP_POSITION = new THREE.Vector3(0.17, -0.16, -0.34);
 const ADS_POSITION = new THREE.Vector3(0, -0.082, -0.24);
 const HIP_ROTATION = new THREE.Euler(0.03, 0.12, 0.02);
 const ADS_ROTATION = new THREE.Euler(0, 0, 0);
+/** Aim-down-sights blend at which a scoped optic swaps to the overlay. */
+const SCOPE_TAKEOVER = 0.55;
 
 export interface ViewmodelInput {
   /** Horizontal speed in m/s, for the walk bob. */
@@ -39,6 +41,7 @@ export class Viewmodel {
   private swayPitch = 0;
   private landDip = 0;
   private wasOnGround = true;
+  private scopedNow = false;
 
   constructor(private readonly scene: THREE.Scene) {
     scene.add(this.holder);
@@ -61,6 +64,12 @@ export class Viewmodel {
     if (!this.model || !this.def) return;
 
     this.adsBlend += (Number(input.ads) - this.adsBlend) * Math.min(1, dt * 16);
+
+    // Once a magnified optic is most of the way up, the scope overlay takes
+    // over the whole view and the weapon would only be in the way.
+    this.scopedNow = this.def.scoped && this.adsBlend > SCOPE_TAKEOVER;
+    this.holder.visible = !this.scopedNow;
+    if (this.scopedNow) return;
 
     // Spring the recoil kick back to rest.
     this.kickVelocity -= this.kick * 320 * dt;
@@ -116,6 +125,11 @@ export class Viewmodel {
 
   get adsAmount(): number {
     return this.adsBlend;
+  }
+
+  /** True while a magnified optic has replaced the viewmodel. */
+  get scoped(): boolean {
+    return this.scopedNow;
   }
 
   dispose(): void {

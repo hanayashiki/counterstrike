@@ -28,6 +28,9 @@ const GLASS = new THREE.MeshStandardMaterial({
   metalness: 0.1,
   emissive: 0x1b4a63,
   emissiveIntensity: 1.4,
+  transparent: true,
+  opacity: 0.45,
+  depthWrite: false,
 });
 
 function block(

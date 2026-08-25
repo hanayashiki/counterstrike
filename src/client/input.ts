@@ -9,6 +9,8 @@ import {
   BTN_CROUCH,
   BTN_FORWARD,
   BTN_JUMP,
+  BTN_LEAN_LEFT,
+  BTN_LEAN_RIGHT,
   BTN_LEFT,
   BTN_RELOAD,
   BTN_RIGHT,
@@ -103,6 +105,9 @@ export class InputController {
       if (this.held.has('ControlLeft') || this.held.has('KeyC')) buttons |= BTN_CROUCH;
       if (this.held.has('ShiftLeft')) buttons |= BTN_WALK;
       if (this.held.has('KeyR')) buttons |= BTN_RELOAD;
+      // Holding both cancels out, which is what the server computes too.
+      if (this.held.has('KeyQ')) buttons |= BTN_LEAN_LEFT;
+      if (this.held.has('KeyE')) buttons |= BTN_LEAN_RIGHT;
       if ((this.mouseButtons & 1) !== 0) buttons |= BTN_ATTACK;
       if ((this.mouseButtons & 2) !== 0) buttons |= BTN_ADS;
     }

@@ -178,6 +178,7 @@ test('a full snapshot with every event kind roundtrips', () => {
       reloadMs: 1200,
       spread: 340,
       height: 1.15,
+      lean: -0.75,
     },
     entities: [
       {
@@ -191,6 +192,7 @@ test('a full snapshot with every event kind roundtrips', () => {
         health: 100,
         weapon: 1,
         heightCm: 180,
+        lean: 0.5,
       },
       {
         id: 9,
@@ -203,6 +205,7 @@ test('a full snapshot with every event kind roundtrips', () => {
         health: 0,
         weapon: 3,
         heightCm: 115,
+        lean: 0,
       },
     ],
     events,
@@ -221,10 +224,12 @@ test('a full snapshot with every event kind roundtrips', () => {
   assert.ok(Math.abs(decoded.local.x - snapshot.local.x) < 0.002);
   assert.ok(Math.abs(decoded.local.vz - snapshot.local.vz) < 0.02);
   assert.ok(Math.abs(decoded.local.height - 1.15) < 0.006);
+  assert.ok(Math.abs(decoded.local.lean - -0.75) < 0.01, 'lean must survive the round trip');
 
   assert.equal(decoded.entities.length, 2);
   assert.equal(decoded.entities[0]?.id, 8);
   assert.equal(decoded.entities[1]?.heightCm, 115);
+  assert.ok(Math.abs((decoded.entities[0]?.lean ?? 0) - 0.5) < 0.01);
 
   assert.equal(decoded.events.length, events.length);
   for (const [i, original] of events.entries()) {
@@ -261,6 +266,7 @@ test('an empty snapshot encodes and decodes cleanly', () => {
       reloadMs: 0,
       spread: 0,
       height: 1.8,
+      lean: 0,
     },
     entities: [],
     events: [],
@@ -295,6 +301,7 @@ test('snapshots stay small enough for a 32 Hz stream', () => {
       reloadMs: 0,
       spread: 30,
       height: 1.8,
+      lean: 0,
     },
     entities: Array.from({ length: 15 }, (_, i) => ({
       id: i + 1,
@@ -307,6 +314,7 @@ test('snapshots stay small enough for a 32 Hz stream', () => {
       health: 100,
       weapon: 2,
       heightCm: 180,
+      lean: 0,
     })),
     events: [],
   };

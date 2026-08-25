@@ -135,6 +135,54 @@ body {
     linear-gradient(-45deg, transparent 45%, var(--red) 45%, var(--red) 55%, transparent 55%);
 }
 
+/* Scoped optics replace the viewmodel entirely: a circular lens, everything
+   outside it blacked out, and a simple etched reticle. */
+#scope {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+#scope .lens {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 82vmin;
+  height: 82vmin;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 2px solid rgba(0, 0, 0, 0.95);
+  box-shadow:
+    0 0 0 100vmax rgba(0, 0, 0, 0.97),
+    inset 0 0 90px rgba(0, 0, 0, 0.9),
+    inset 0 0 18px rgba(120, 190, 255, 0.09);
+}
+
+#scope .reticle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  background: rgba(6, 8, 10, 0.92);
+  transform: translate(-50%, -50%);
+}
+
+#scope .reticle.v {
+  width: 1px;
+  height: 82vmin;
+}
+
+#scope .reticle.h {
+  height: 1px;
+  width: 82vmin;
+}
+
+#scope .reticle.dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: rgba(255, 70, 50, 0.9);
+}
+
 #damage-ring {
   position: absolute;
   inset: 0;

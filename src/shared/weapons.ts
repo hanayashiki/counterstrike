@@ -39,6 +39,12 @@ export interface WeaponDef {
   readonly moveSpeedMultiplier: number;
   readonly adsSpreadMultiplier: number;
   readonly adsFov: number;
+  /**
+   * True for magnified optics. Aiming one swaps the viewmodel out for a scope
+   * overlay instead of holding the weapon in front of the camera - otherwise
+   * the scope body sits in the middle of the screen and blocks the shot.
+   */
+  readonly scoped: boolean;
   readonly tracerColor: number;
   /** Rough model dimensions for the first-person viewmodel, in meters. */
   readonly modelLength: number;
@@ -73,6 +79,7 @@ export const WEAPONS: readonly WeaponDef[] = [
     moveSpeedMultiplier: 1.05,
     adsSpreadMultiplier: 0.6,
     adsFov: 62,
+    scoped: false,
     tracerColor: 0xffd27a,
     modelLength: 0.26,
   },
@@ -104,6 +111,7 @@ export const WEAPONS: readonly WeaponDef[] = [
     moveSpeedMultiplier: 1.0,
     adsSpreadMultiplier: 0.65,
     adsFov: 58,
+    scoped: false,
     tracerColor: 0xbfe7ff,
     modelLength: 0.42,
   },
@@ -135,6 +143,7 @@ export const WEAPONS: readonly WeaponDef[] = [
     moveSpeedMultiplier: 0.93,
     adsSpreadMultiplier: 0.45,
     adsFov: 48,
+    scoped: false,
     tracerColor: 0xffe2a8,
     modelLength: 0.62,
   },
@@ -166,6 +175,7 @@ export const WEAPONS: readonly WeaponDef[] = [
     moveSpeedMultiplier: 0.82,
     adsSpreadMultiplier: 0.06,
     adsFov: 22,
+    scoped: true,
     tracerColor: 0xffffff,
     modelLength: 0.86,
   },

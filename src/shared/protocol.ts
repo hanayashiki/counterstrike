@@ -6,7 +6,7 @@
 import { type BinaryReader, BinaryWriter, type Bytes } from './binary';
 import type { TeamId } from './map';
 
-export const PROTOCOL_VERSION = 3;
+export const PROTOCOL_VERSION = 4;
 
 export const enum MsgType {
   // client -> server
@@ -81,6 +81,8 @@ export interface EntitySnapshot {
   weapon: number;
   /** Hull height in centimeters, so the client can render crouch poses. */
   heightCm: number;
+  /** Lean, -1..1, so the peek is visible to everyone else. */
+  lean: number;
 }
 
 export interface LocalSnapshot {
@@ -102,6 +104,7 @@ export interface LocalSnapshot {
   /** Current spread cone half-angle * 10000. */
   spread: number;
   height: number;
+  lean: number;
 }
 
 export type GameEvent =
@@ -309,6 +312,7 @@ export function writeSnapshot(w: BinaryWriter, s: Snapshot): void {
   w.u8(l.health).u8(l.armor).u8(l.weapon);
   w.u16(l.ammo).u16(l.reserve).u16(l.reloadMs).u16(l.spread);
   w.u16(Math.round(l.height * 100));
+  w.i8(Math.round(l.lean * 127));
 
   w.u8(Math.min(255, s.entities.length));
   for (let i = 0; i < s.entities.length && i < 255; i++) {
@@ -317,6 +321,7 @@ export function writeSnapshot(w: BinaryWriter, s: Snapshot): void {
     w.pos(e.x).pos(e.y).pos(e.z);
     w.yaw(e.yaw).pitch(e.pitch);
     w.u8(e.flags).u8(e.health).u8(e.weapon).u8(Math.min(255, e.heightCm));
+    w.i8(Math.round(e.lean * 127));
   }
 
   w.u8(Math.min(255, s.events.length));
@@ -431,6 +436,7 @@ export function readSnapshot(r: BinaryReader): Snapshot {
     reloadMs: r.u16(),
     spread: r.u16(),
     height: r.u16() / 100,
+    lean: r.i8() / 127,
   };
 
   const entityCount = r.u8();
@@ -447,6 +453,7 @@ export function readSnapshot(r: BinaryReader): Snapshot {
       health: r.u8(),
       weapon: r.u8(),
       heightCm: r.u8(),
+      lean: r.i8() / 127,
     });
   }
 

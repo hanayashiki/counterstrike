@@ -16,12 +16,20 @@ import {
   BTN_ADS,
   BTN_CROUCH,
   BTN_JUMP,
+  BTN_LEAN_LEFT,
+  BTN_LEAN_RIGHT,
   BTN_WALK,
   EYE_OFFSET,
   GRAVITY,
   GROUND_ACCEL,
   GROUND_FRICTION,
   JUMP_SPEED,
+  LEAN_DISTANCE,
+  LEAN_DROP,
+  LEAN_PROBE_HEIGHT,
+  LEAN_PROBE_RADIUS,
+  LEAN_RATE,
+  LEAN_SPEED_SCALE,
   MAX_AIR_WISH_SPEED,
   MAX_CROUCH_SPEED,
   MAX_GROUND_SPEED,
@@ -30,7 +38,7 @@ import {
   PLAYER_RADIUS,
   STOP_SPEED,
 } from './config';
-import type { Vec3 } from './math';
+import { type Vec3, clamp } from './math';
 
 export interface MoveState {
   pos: Vec3;
@@ -41,6 +49,8 @@ export interface MoveState {
   crouching: boolean;
   /** Current hull height; interpolates between standing and crouching. */
   height: number;
+  /** Lean, -1 (fully left) to 1 (fully right). Eases toward the input. */
+  lean: number;
 }
 
 export interface MoveInput {
@@ -59,6 +69,47 @@ const CROUCH_TRANSITION_PER_SEC = 6;
 
 export const eyeHeight = (state: MoveState): number => state.height - EYE_OFFSET;
 export const eyeY = (state: MoveState): number => state.pos.y + state.height - EYE_OFFSET;
+
+/**
+ * Where this player is looking from, including any lean.
+ *
+ * Everything that needs a viewpoint goes through here - the client's camera,
+ * the server's bullet traces, and bot line-of-sight - so a leaning player
+ * shoots from exactly where they see from.
+ */
+export function eyePosition(out: Vec3, state: MoveState): Vec3 {
+  // Right vector for this yaw is (cos, -sin); see the wish-direction maths below.
+  const offset = state.lean * LEAN_DISTANCE;
+  out.x = state.pos.x + Math.cos(state.yaw) * offset;
+  out.y = state.pos.y + state.height - EYE_OFFSET - Math.abs(state.lean) * LEAN_DROP;
+  out.z = state.pos.z - Math.sin(state.yaw) * offset;
+  return out;
+}
+
+/** Would the head clip into geometry at this lean? */
+function leanBlocked(state: MoveState, brushes: readonly Brush[], lean: number): boolean {
+  const offset = lean * LEAN_DISTANCE;
+  const x = state.pos.x + Math.cos(state.yaw) * offset;
+  const z = state.pos.z - Math.sin(state.yaw) * offset;
+  const y =
+    state.pos.y + state.height - EYE_OFFSET - Math.abs(lean) * LEAN_DROP - LEAN_PROBE_HEIGHT / 2;
+  return hullOverlapsWorld(x, y, z, LEAN_PROBE_RADIUS, LEAN_PROBE_HEIGHT, brushes);
+}
+
+const LEAN_STEPS = [1, 0.75, 0.5, 0.25] as const;
+
+/**
+ * Largest lean in `direction` that keeps the head out of the world. Stepping
+ * through a fixed ladder keeps this deterministic and costs at most four hull
+ * tests, so the client predicts the same clamp the server applies.
+ */
+export function maxLean(state: MoveState, brushes: readonly Brush[], direction: number): number {
+  if (direction === 0) return 0;
+  for (const amount of LEAN_STEPS) {
+    if (!leanBlocked(state, brushes, direction * amount)) return amount;
+  }
+  return 0;
+}
 
 function applyFriction(vel: Vec3, dt: number): void {
   const speed = Math.hypot(vel.x, vel.z);
@@ -121,6 +172,16 @@ export function stepMovement(
 
   state.onGround = isGrounded(state.pos, PLAYER_RADIUS, brushes) && state.vel.y <= 0.1;
 
+  // Leaning: only on the ground, and never further than the wall allows.
+  const leanInput =
+    ((input.buttons & BTN_LEAN_RIGHT) === 0 ? 0 : 1) -
+    ((input.buttons & BTN_LEAN_LEFT) === 0 ? 0 : 1);
+  let leanTarget = state.onGround ? leanInput : 0;
+  if (leanTarget !== 0) leanTarget = Math.sign(leanTarget) * maxLean(state, brushes, leanTarget);
+  const leanStep = LEAN_RATE * dt;
+  state.lean += clamp(leanTarget - state.lean, -leanStep, leanStep);
+  if (Math.abs(state.lean) < 1e-4) state.lean = 0;
+
   // Build the wish direction in world space from the yaw-relative input axes.
   const sinYaw = Math.sin(state.yaw);
   const cosYaw = Math.cos(state.yaw);
@@ -137,6 +198,7 @@ export function stepMovement(
   maxSpeed *= speedScale;
   if ((input.buttons & BTN_WALK) !== 0) maxSpeed *= WALK_SPEED_SCALE;
   if ((input.buttons & BTN_ADS) !== 0) maxSpeed *= ADS_SPEED_SCALE;
+  if (state.lean !== 0) maxSpeed *= LEAN_SPEED_SCALE;
   const wishSpeed = Math.min(wishLen, 1) * maxSpeed;
 
   if (state.onGround) {

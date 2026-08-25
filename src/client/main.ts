@@ -15,6 +15,9 @@ import * as THREE from 'three';
 import {
   BTN_ADS,
   EYE_OFFSET,
+  LEAN_DISTANCE,
+  LEAN_DROP,
+  LEAN_ROLL,
   INTERP_DELAY_MS,
   RESPAWN_DELAY_MS,
   TICK_RATE,
@@ -444,13 +447,25 @@ class Game {
     }
     const bob = state.onGround ? Math.sin(this.bobPhase) * 0.014 * Math.min(1, speed / 7) : 0;
 
+    // Lean slides the viewpoint sideways past the hull and rolls the horizon.
+    // The server applies the identical offset when it traces our shots, so the
+    // peek is real rather than cosmetic.
+    const leanOffset = state.lean * LEAN_DISTANCE;
+    const cosYaw = Math.cos(this.input.yaw);
+    const sinYaw = Math.sin(this.input.yaw);
+
     const camera = this.ctx.camera;
     camera.position.set(
-      this.eye.x,
-      this.eye.y + state.height - EYE_OFFSET + bob - this.landDip,
-      this.eye.z,
+      this.eye.x + cosYaw * leanOffset,
+      this.eye.y +
+        state.height -
+        EYE_OFFSET -
+        Math.abs(state.lean) * LEAN_DROP +
+        bob -
+        this.landDip,
+      this.eye.z - sinYaw * leanOffset,
     );
-    camera.rotation.set(this.input.pitch, this.input.yaw, 0, 'YXZ');
+    camera.rotation.set(this.input.pitch, this.input.yaw, -state.lean * LEAN_ROLL, 'YXZ');
 
     const ads = this.viewmodel.adsAmount;
     const def = this.local.weapon;
@@ -485,6 +500,7 @@ class Game {
       this.cameraForward,
       this.myTeam,
     );
+    this.hud.setScoped(this.viewmodel.scoped);
     this.hud.setCrosshair(
       this.local.currentSpread(adsHeld),
       (this.ctx.camera.fov * Math.PI) / 180,

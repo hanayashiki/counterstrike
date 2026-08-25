@@ -4,7 +4,14 @@ import { test } from 'node:test';
 import { createBot } from '../src/game/bot';
 import type { Combatant } from '../src/game/combatant';
 import { GameWorld, TICK_MS, emptySnapshot } from '../src/game/world';
-import { BTN_ATTACK, MAX_HEALTH, TICK_RATE } from '../src/shared/config';
+import {
+  BTN_ATTACK,
+  BTN_CROUCH,
+  BTN_LEAN_RIGHT,
+  LEAN_DISTANCE,
+  MAX_HEALTH,
+  TICK_RATE,
+} from '../src/shared/config';
 import { TEAM_BLUE, TEAM_RED } from '../src/shared/map';
 import { anglesFromForward, vec3 } from '../src/shared/math';
 import { EventKind, type InputCommand, MatchPhase, PF_ALIVE } from '../src/shared/protocol';
@@ -237,6 +244,112 @@ test('point-blank fire damages an enemy and never a teammate', () => {
   world.queueInput(shooter.id, [attackCommand(2, atFriend.yaw, atFriend.pitch)]);
   world.step();
   assert.equal(friend.health, before);
+});
+
+test("a gap in the input stream does not release the player's keys", () => {
+  const world = makeWorld(2, 21);
+  const player = world.addPlayer('Holder', false, TEAM_RED, WeaponId.Rifle);
+  place(player, OPEN_X, OPEN_Z);
+
+  // Establish a held pose: crouched and leaning.
+  for (let seq = 1; seq <= 30; seq++) {
+    world.queueInput(player.id, [
+      {
+        seq,
+        dtMs: 16,
+        buttons: BTN_CROUCH | BTN_LEAN_RIGHT,
+        yaw: 0,
+        pitch: 0,
+        moveX: 0,
+        moveZ: 0,
+      },
+    ]);
+    world.step();
+    place(player, OPEN_X, OPEN_Z);
+  }
+  assert.ok(player.move.lean > 0.95, `lean did not commit (${player.move.lean})`);
+  assert.equal(player.move.crouching, true);
+
+  // Now the packets stop. Ordinary jitter is a tick or two; the pose must hold.
+  for (let i = 0; i < 4; i++) {
+    world.step();
+    place(player, OPEN_X, OPEN_Z);
+  }
+  assert.ok(player.move.lean > 0.95, `lean decayed to ${player.move.lean} after a brief gap`);
+  assert.equal(player.move.crouching, true, 'a dropped packet must not stand the player up');
+
+  // A client that genuinely stops talking comes to rest instead.
+  for (let i = 0; i < 40; i++) {
+    world.step();
+    place(player, OPEN_X, OPEN_Z);
+  }
+  assert.ok(player.move.lean < 0.05, `lean never released (${player.move.lean})`);
+});
+
+test('a stalled client cannot keep firing or jumping', () => {
+  const world = makeWorld(2, 22);
+  const player = world.addPlayer('Stalled', false, TEAM_RED, WeaponId.Rifle);
+  place(player, OPEN_X, OPEN_Z);
+
+  world.queueInput(player.id, [
+    { seq: 1, dtMs: 16, buttons: BTN_ATTACK, yaw: 0, pitch: -0.1, moveX: 0, moveZ: 0 },
+  ]);
+  world.step();
+  const ammoAfterFirstShot = player.weapon.ammo;
+  assert.equal(ammoAfterFirstShot, 29, 'the real command should have fired once');
+
+  // Input stops. The trigger must not be held down on our behalf.
+  for (let i = 0; i < 30; i++) world.step();
+  assert.equal(player.weapon.ammo, ammoAfterFirstShot, 'a stalled client kept shooting');
+  assert.ok(player.move.onGround, 'a stalled client kept jumping');
+});
+
+test('the server traces shots from the leaned eye, not the hull centre', () => {
+  const world = makeWorld(2, 5);
+  const shooter = world.addPlayer('Peeker', false, TEAM_RED, WeaponId.Rifle);
+  place(shooter, OPEN_X, OPEN_Z);
+
+  // Hold the lean until it is fully committed.
+  const yaw = 0;
+  for (let seq = 1; seq <= 24; seq++) {
+    world.queueInput(shooter.id, [
+      { seq, dtMs: 16, buttons: BTN_LEAN_RIGHT, yaw, pitch: 0, moveX: 0, moveZ: 0 },
+    ]);
+    world.step();
+    shooter.move.pos.x = OPEN_X;
+    shooter.move.pos.z = OPEN_Z;
+  }
+  world.clearEvents();
+
+  assert.ok(shooter.move.lean > 0.95, `lean only reached ${shooter.move.lean}`);
+
+  // At yaw = 0 the player looks down -Z and right is +X, so a full right lean
+  // should slide the viewpoint a full LEAN_DISTANCE toward +X.
+  const eye = shooter.eyePosition(vec3());
+  assert.ok(
+    Math.abs(eye.x - (OPEN_X + LEAN_DISTANCE)) < 0.01,
+    `leaned eye sits at x=${eye.x}, expected ${OPEN_X + LEAN_DISTANCE}`,
+  );
+  assert.ok(Math.abs(eye.z - OPEN_Z) < 0.01, 'lean must not move the eye forward or back');
+
+  // Fire, and confirm the authoritative tracer starts from that leaned eye.
+  world.queueInput(shooter.id, [
+    { seq: 100, dtMs: 16, buttons: BTN_ATTACK | BTN_LEAN_RIGHT, yaw, pitch: 0, moveX: 0, moveZ: 0 },
+  ]);
+  world.step();
+
+  const snapshot = emptySnapshot();
+  world.buildSnapshot(shooter.id, snapshot);
+  const shot = snapshot.events.find((e) => e.kind === EventKind.Shot);
+  assert.ok(shot && shot.kind === EventKind.Shot, 'no shot was recorded');
+  assert.ok(
+    Math.abs(shot.ox - (OPEN_X + LEAN_DISTANCE)) < 0.05,
+    `bullet came from x=${shot.ox}, not the leaned eye at ${OPEN_X + LEAN_DISTANCE}`,
+  );
+  assert.ok(
+    shot.ox - OPEN_X > 0.3,
+    'the shot origin must be meaningfully displaced from the hull centre',
+  );
 });
 
 test('lag compensation rewinds a moving target to where the shooter saw it', () => {

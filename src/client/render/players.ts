@@ -8,7 +8,14 @@
  */
 import * as THREE from 'three';
 
-import { INTERP_DELAY_MS, PLAYER_HEIGHT, PLAYER_RADIUS } from '../../shared/config';
+import {
+  INTERP_DELAY_MS,
+  LEAN_DISTANCE,
+  LEAN_DROP,
+  LEAN_ROLL,
+  PLAYER_HEIGHT,
+  PLAYER_RADIUS,
+} from '../../shared/config';
 import { TEAM_COLORS, type TeamId } from '../../shared/map';
 import { wrapAngle } from '../../shared/math';
 import { type EntitySnapshot, PF_ALIVE, PF_CROUCH, PF_TEAM_BLUE } from '../../shared/protocol';
@@ -25,6 +32,7 @@ interface Sample {
   height: number;
   alive: boolean;
   crouching: boolean;
+  lean: number;
 }
 
 const BUFFER_LIMIT = 24;
@@ -149,6 +157,7 @@ export class RemotePlayer {
       height: entity.heightCm / 100,
       alive,
       crouching: (entity.flags & PF_CROUCH) !== 0,
+      lean: entity.lean,
     };
 
     const last = this.samples.at(-1);
@@ -190,6 +199,7 @@ export class RemotePlayer {
     const yaw = a.yaw + (b.yaw - a.yaw) * t;
     const pitch = a.pitch + (b.pitch - a.pitch) * t;
     const height = a.height + (b.height - a.height) * t;
+    const lean = a.lean + (b.lean - a.lean) * t;
 
     this.root.visible = a.alive;
     if (!a.alive) return;
@@ -201,7 +211,11 @@ export class RemotePlayer {
     const scale = height / PLAYER_HEIGHT;
     this.hips.scale.y = scale;
     this.hips.position.y = 0.86 * scale;
-    this.upper.position.y = 0.86 * scale;
+    // The torso leans out while the feet stay put - so a peeking opponent
+    // shows exactly the sliver of body that their own camera has bought them.
+    this.upper.position.x = lean * LEAN_DISTANCE;
+    this.upper.position.y = 0.86 * scale - Math.abs(lean) * LEAN_DROP;
+    this.upper.rotation.z = -lean * LEAN_ROLL * 1.8;
     this.head.rotation.x = -pitch * 0.55;
     if (this.weaponRoot) this.weaponRoot.rotation.x = -pitch;
 

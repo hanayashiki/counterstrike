@@ -11,7 +11,7 @@ import {
 } from '../shared/config';
 import type { TeamId } from '../shared/map';
 import { type Vec3, vec3 } from '../shared/math';
-import type { MoveState } from '../shared/movement';
+import { type MoveState, eyePosition } from '../shared/movement';
 import {
   type InputCommand,
   PF_ADS,
@@ -51,6 +51,7 @@ export class Combatant {
     onGround: false,
     crouching: false,
     height: PLAYER_HEIGHT,
+    lean: 0,
   };
 
   health = MAX_HEALTH;
@@ -85,6 +86,10 @@ export class Combatant {
 
   lastProcessedSeq = 0;
   readonly pendingInputs: InputCommand[] = [];
+  /** Most recent command actually applied, re-used when input starves. */
+  lastCommand: InputCommand | null = null;
+  /** Consecutive ticks with no input to process. */
+  starvedTicks = 0;
   /** Round-trip time in ms, measured via ping/pong (0 for bots). */
   pingMs = 0;
 
@@ -114,12 +119,12 @@ export class Combatant {
     return this.reloadEndsAtMs > 0;
   }
 
-  /** Eye position, which is where shots originate from. */
+  /**
+   * Eye position, which is where shots originate from. Includes lean, so a
+   * player peeking round a corner really does shoot from the peek.
+   */
   eyePosition(out: Vec3): Vec3 {
-    out.x = this.move.pos.x;
-    out.y = this.move.pos.y + this.move.height - 0.15;
-    out.z = this.move.pos.z;
-    return out;
+    return eyePosition(out, this.move);
   }
 
   setLoadout(primary: WeaponId): void {
