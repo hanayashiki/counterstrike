@@ -114,6 +114,12 @@ export class GameWorld {
   private readonly privateEvents = new Map<number, GameEvent[]>();
   /** Set whenever roster metadata changed and PlayerInfo needs re-sending. */
   dirtyRoster = new Set<number>();
+  /**
+   * Ids that left since the last flush. Bots are removed silently by team
+   * balancing, so without announcing them every client's scoreboard would
+   * slowly fill up with players that are no longer in the match.
+   */
+  readonly departed: number[] = [];
   matchStateDirty = true;
 
   private nextId = 1;
@@ -202,10 +208,12 @@ export class GameWorld {
   }
 
   removePlayer(id: number): void {
-    this.combatants.delete(id);
+    if (!this.combatants.delete(id)) return;
     this.privateEvents.delete(id);
+    this.dirtyRoster.delete(id);
     const index = this.bots.findIndex((b) => b.combatant.id === id);
     if (index >= 0) this.bots.splice(index, 1);
+    this.departed.push(id);
   }
 
   /** Drop or add bots so the match stays at the configured headcount. */

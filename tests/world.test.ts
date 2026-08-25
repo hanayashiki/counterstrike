@@ -89,6 +89,47 @@ test('a joining human displaces a bot and the teams re-balance', () => {
   assert.equal(world.humanCount, 0);
 });
 
+test('every removal is announced so client rosters cannot accumulate ghosts', () => {
+  const world = makeWorld(10);
+  world.balanceBots();
+  world.departed.length = 0;
+
+  // A human joining pushes the room over its headcount, so balancing drops a
+  // bot. That bot has to be announced or every existing client keeps it.
+  const human = world.addPlayer('Tester', false, -1, WeaponId.Rifle);
+  world.balanceBots();
+
+  assert.equal(world.playerCount, 10);
+  assert.ok(world.departed.length > 0, 'a displaced bot was removed without notice');
+  for (const id of world.departed) {
+    assert.ok(!world.combatants.has(id), `id ${id} was announced as gone but is still present`);
+    assert.ok(!world.dirtyRoster.has(id), 'a departed id must not still be queued for PlayerInfo');
+  }
+
+  // Model what a client does with the two message streams and check the
+  // resulting roster matches the server exactly.
+  const roster = new Set<number>(world.combatants.keys());
+  for (const id of world.departed) roster.delete(id);
+  world.departed.length = 0;
+
+  world.removePlayer(human.id);
+  world.balanceBots();
+  for (const id of world.dirtyRoster) roster.add(id);
+  for (const id of world.departed) roster.delete(id);
+
+  assert.equal(roster.size, world.playerCount, 'client roster drifted from the server');
+  assert.deepEqual([...roster].toSorted(), [...world.combatants.keys()].toSorted());
+});
+
+test('removing the same player twice announces it once', () => {
+  const world = makeWorld(4);
+  const player = world.addPlayer('Tester', false, -1, WeaponId.Rifle);
+  world.departed.length = 0;
+  world.removePlayer(player.id);
+  world.removePlayer(player.id);
+  assert.deepEqual(world.departed, [player.id]);
+});
+
 test('a full minute of bot combat produces a coherent match', () => {
   const world = makeWorld(10, 987);
   world.balanceBots();

@@ -509,6 +509,10 @@ export function decodeMatchState(r: BinaryReader): MatchStateMsg {
   };
 }
 
+export function encodePlayerLeft(id: number): Bytes {
+  return new BinaryWriter(4).u8(MsgType.PlayerLeft).u16(id).finish();
+}
+
 export function encodeChatBroadcast(fromId: number, text: string): Bytes {
   return new BinaryWriter(160).u8(MsgType.ChatBroadcast).u16(fromId).string(text).finish();
 }

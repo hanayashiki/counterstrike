@@ -57,6 +57,8 @@ let snapshots = 0;
 let entityTotal = 0;
 let maxTick = 0;
 let matchStates = 0;
+let departures = 0;
+let lastEntityCount = 0;
 let lastError: string | null = null;
 
 // Prediction accuracy tracking.
@@ -158,6 +160,11 @@ socket.on('message', (data: ArrayBuffer | Buffer) => {
       roster.set(info.id, info);
       return;
     }
+    case MsgType.PlayerLeft: {
+      roster.delete(reader.u16());
+      departures++;
+      return;
+    }
     case MsgType.MatchState: {
       decodeMatchState(reader);
       matchStates++;
@@ -168,6 +175,7 @@ socket.on('message', (data: ArrayBuffer | Buffer) => {
       snapshots++;
       maxTick = Math.max(maxTick, snapshot.tick);
       entityTotal += snapshot.entities.length;
+      lastEntityCount = snapshot.entities.length;
 
       const beforeX = local.state.pos.x;
       const beforeY = local.state.pos.y;
@@ -228,6 +236,10 @@ function finish(): void {
   console.log(`avg entities/snap   ${snapshots ? (entityTotal / snapshots).toFixed(1) : '0'}`);
   console.log(`bots that moved     ${moved}`);
   console.log(`match states        ${matchStates}`);
+  console.log(`departures          ${departures}`);
+  console.log(
+    `roster vs snapshot  ${roster.size} known, ${lastEntityCount + 1} in the last snapshot`,
+  );
   console.log(`distance walked     ${distanceWalked.toFixed(1)} m`);
   console.log(
     `prediction error    mean ${(meanCorrection * 100).toFixed(2)} cm, max ${(correctionMax * 100).toFixed(2)} cm (n=${correctionSamples})`,
@@ -243,6 +255,13 @@ function finish(): void {
   if (bots.length < 4) problems.push(`expected the room to fill with bots, saw ${bots.length}`);
   if (moved < 3) problems.push(`bots are not navigating (${moved} moved)`);
   if (!seenEvents.has(EventKind.Shot)) problems.push('no shots were fired');
+  // The roster is built from PlayerInfo/PlayerLeft; snapshots are built from the
+  // live world. If they disagree the client is holding on to players that left.
+  if (roster.size !== lastEntityCount + 1) {
+    problems.push(
+      `roster drifted: ${roster.size} known players vs ${lastEntityCount + 1} in the snapshot`,
+    );
+  }
   if (distanceWalked < 5)
     problems.push(`local player barely moved (${distanceWalked.toFixed(1)} m)`);
   if (correctionSamples < 10) problems.push('not enough prediction samples');

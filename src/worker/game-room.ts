@@ -24,6 +24,7 @@ import {
   encodeKick,
   encodeMatchState,
   encodePlayerInfo,
+  encodePlayerLeft,
   encodePong,
   encodeWelcome,
   writeSnapshot,
@@ -259,6 +260,12 @@ export class GameRoom implements DurableObject {
   }
 
   private flushRoster(world: GameWorld): void {
+    // Departures first: a client that still has a stale id would otherwise
+    // render one more PlayerInfo update for someone who already left.
+    if (world.departed.length > 0) {
+      for (const id of world.departed) this.broadcast(encodePlayerLeft(id));
+      world.departed.length = 0;
+    }
     if (world.dirtyRoster.size > 0) {
       for (const id of world.dirtyRoster) {
         const combatant = world.combatants.get(id);
@@ -401,9 +408,10 @@ export class GameRoom implements DurableObject {
   private dropSession(session: Session): void {
     if (!this.sessions.delete(session.ws)) return;
     if (session.joined && this.world) {
+      // `removePlayer` queues the departure; the next flush announces it along
+      // with any bots that balancing removed to make room.
       this.world.removePlayer(session.playerId);
       this.world.balanceBots();
-      this.broadcast(new BinaryWriter(4).u8(MsgType.PlayerLeft).u16(session.playerId).finish());
     }
     try {
       session.ws.close(1000, 'bye');
