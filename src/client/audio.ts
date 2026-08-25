@@ -14,6 +14,16 @@ interface ShotVoice {
   lowpassTo: number;
   thump: number;
   gain: number;
+  /**
+   * Bright attack transient layered over the body. This is what makes a shot
+   * read as sharp rather than muffled: a very short burst of high-passed noise
+   * that models the initial crack before the low end blooms. 0 disables it.
+   */
+  crackGain: number;
+  /** High-pass corner for the transient, in Hz. */
+  crackHz: number;
+  /** How long the transient takes to decay, in seconds. */
+  crackDuration: number;
 }
 
 const SHOT_VOICES: Record<number, ShotVoice> = {
@@ -25,6 +35,9 @@ const SHOT_VOICES: Record<number, ShotVoice> = {
     lowpassTo: 700,
     thump: 130,
     gain: 0.55,
+    crackGain: 0,
+    crackHz: 0,
+    crackDuration: 0,
   },
   [WeaponId.Smg]: {
     duration: 0.13,
@@ -34,6 +47,9 @@ const SHOT_VOICES: Record<number, ShotVoice> = {
     lowpassTo: 900,
     thump: 150,
     gain: 0.48,
+    crackGain: 0,
+    crackHz: 0,
+    crackDuration: 0,
   },
   [WeaponId.Rifle]: {
     duration: 0.24,
@@ -43,15 +59,24 @@ const SHOT_VOICES: Record<number, ShotVoice> = {
     lowpassTo: 520,
     thump: 95,
     gain: 0.72,
+    crackGain: 0,
+    crackHz: 0,
+    crackDuration: 0,
   },
   [WeaponId.Shotgun]: {
-    duration: 0.34,
-    bandpass: 620,
-    bandQ: 0.55,
-    lowpassFrom: 6500,
-    lowpassTo: 260,
-    thump: 76,
-    gain: 0.88,
+    // Tighter and brighter than a pure boom: the body still carries weight,
+    // but the lowpass now opens up to 12 kHz before it closes, and a short
+    // high-passed crack sits on the front of it.
+    duration: 0.28,
+    bandpass: 950,
+    bandQ: 0.85,
+    lowpassFrom: 12000,
+    lowpassTo: 420,
+    thump: 80,
+    gain: 0.86,
+    crackGain: 0.5,
+    crackHz: 3200,
+    crackDuration: 0.055,
   },
   [WeaponId.Sniper]: {
     duration: 0.55,
@@ -61,6 +86,9 @@ const SHOT_VOICES: Record<number, ShotVoice> = {
     lowpassTo: 320,
     thump: 68,
     gain: 0.95,
+    crackGain: 0,
+    crackHz: 0,
+    crackDuration: 0,
   },
 };
 
@@ -182,6 +210,32 @@ export class AudioEngine {
     noise.connect(bandpass).connect(lowpass).connect(gain).connect(target);
     noise.start(now);
     noise.stop(now + voice.duration + 0.02);
+
+    // The attack transient, layered in front of the body.
+    if (voice.crackGain > 0) {
+      const crack = ctx.createBufferSource();
+      crack.buffer = noiseBuffer;
+      crack.playbackRate.value = 1.35 + Math.random() * 0.45;
+
+      const highpass = ctx.createBiquadFilter();
+      highpass.type = 'highpass';
+      highpass.frequency.value = voice.crackHz;
+
+      // A resonant peak an octave up gives the snap somewhere to sit.
+      const presence = ctx.createBiquadFilter();
+      presence.type = 'peaking';
+      presence.frequency.value = voice.crackHz * 1.7;
+      presence.Q.value = 1.1;
+      presence.gain.value = 7;
+
+      const crackGain = ctx.createGain();
+      crackGain.gain.setValueAtTime(voice.crackGain * loudness, now);
+      crackGain.gain.exponentialRampToValueAtTime(0.0005, now + voice.crackDuration);
+
+      crack.connect(highpass).connect(presence).connect(crackGain).connect(target);
+      crack.start(now);
+      crack.stop(now + voice.crackDuration + 0.02);
+    }
 
     // Low-end body.
     const thump = ctx.createOscillator();

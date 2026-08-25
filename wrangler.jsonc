@@ -41,7 +41,7 @@
 
   "vars": {
     "TARGET_PLAYERS": "10",
-    "BOT_SKILL": "normal",
+    "BOT_SKILL": "easy",
   },
 
   "dev": {
