@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>cs_grid — multiplayer FPS</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><circle cx='16' cy='16' r='13' fill='none' stroke='%23ff6b4a' stroke-width='2'/><path d='M16 4v6M16 22v6M4 16h6M22 16h6' stroke='%23ff6b4a' stroke-width='2'/></svg>"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <canvas id="viewport"></canvas>
+
+    <div id="hud" class="hidden">
+      <div id="crosshair">
+        <span class="ch ch-t"></span><span class="ch ch-b"></span> <span class="ch ch-l"></span
+        ><span class="ch ch-r"></span>
+        <span class="ch-dot"></span>
+      </div>
+      <div id="hitmarker"></div>
+      <div id="damage-ring"></div>
+
+      <div id="top-bar">
+        <div class="team-score team-red">
+          <span class="tname">Raiders</span><b id="score-red">0</b>
+        </div>
+        <div id="round-timer">5:00</div>
+        <div class="team-score team-blue">
+          <b id="score-blue">0</b><span class="tname">Sentinels</span>
+        </div>
+      </div>
+
+      <div id="phase-banner"></div>
+      <div id="killfeed"></div>
+      <div id="chat-log"></div>
+
+      <div id="bottom-left">
+        <div class="stat"><span class="label">HP</span><span id="health">100</span></div>
+        <div class="bar"><i id="health-bar"></i></div>
+        <div class="stat"><span class="label">AR</span><span id="armor">50</span></div>
+        <div class="bar armor"><i id="armor-bar"></i></div>
+      </div>
+
+      <div id="bottom-right">
+        <div id="weapon-name">KR-7 Rifle</div>
+        <div id="ammo"><b id="ammo-mag">30</b><span id="ammo-reserve">/ 90</span></div>
+        <div id="reload-hint" class="hidden">RELOADING</div>
+      </div>
+
+      <div id="respawn" class="hidden">
+        <div class="killer"></div>
+        <div class="countdown">Respawning in <b>3.0</b>s</div>
+      </div>
+
+      <div id="scoreboard" class="hidden">
+        <header>
+          <h2>cs_grid</h2>
+          <div id="sb-round"></div>
+        </header>
+        <div class="sb-teams">
+          <table class="sb team-red">
+            <thead>
+              <tr>
+                <th>Raiders</th>
+                <th>K</th>
+                <th>D</th>
+                <th>A</th>
+                <th>Score</th>
+                <th>Ping</th>
+              </tr>
+            </thead>
+            <tbody id="sb-red"></tbody>
+          </table>
+          <table class="sb team-blue">
+            <thead>
+              <tr>
+                <th>Sentinels</th>
+                <th>K</th>
+                <th>D</th>
+                <th>A</th>
+                <th>Score</th>
+                <th>Ping</th>
+              </tr>
+            </thead>
+            <tbody id="sb-blue"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div id="net-stats">
+        <span id="fps">0 fps</span><span id="ping">0 ms</span><span id="tickinfo"></span>
+      </div>
+
+      <form id="chat-input" class="hidden">
+        <input type="text" maxlength="120" placeholder="Say something…" />
+      </form>
+    </div>
+
+    <div id="menu">
+      <div class="panel">
+        <h1>cs_<span>grid</span></h1>
+        <p class="tagline">
+          Authoritative Cloudflare Durable Object · client-side prediction · bots
+        </p>
+
+        <label class="field">
+          <span>Callsign</span>
+          <input
+            id="menu-name"
+            type="text"
+            maxlength="20"
+            placeholder="Operator"
+            autocomplete="off"
+          />
+        </label>
+
+        <label class="field">
+          <span>Room</span>
+          <input id="menu-room" type="text" maxlength="32" placeholder="lobby" autocomplete="off" />
+        </label>
+
+        <div class="field">
+          <span>Team</span>
+          <div class="choices" id="menu-team">
+            <button type="button" data-value="-1" class="active">Auto</button>
+            <button type="button" data-value="0">Raiders</button>
+            <button type="button" data-value="1">Sentinels</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <span>Primary</span>
+          <div class="choices" id="menu-weapon">
+            <button type="button" data-value="2" class="active">KR-7 Rifle</button>
+            <button type="button" data-value="1">VX-9 SMG</button>
+            <button type="button" data-value="3">LR-50 Bolt</button>
+          </div>
+        </div>
+
+        <button id="menu-play" class="play">Deploy</button>
+        <div id="menu-status"></div>
+
+        <ul class="controls">
+          <li><kbd>WASD</kbd> move</li>
+          <li><kbd>Space</kbd> jump</li>
+          <li><kbd>Ctrl</kbd> crouch</li>
+          <li><kbd>Shift</kbd> walk</li>
+          <li><kbd>LMB</kbd> fire</li>
+          <li><kbd>RMB</kbd> aim</li>
+          <li><kbd>R</kbd> reload</li>
+          <li><kbd>1</kbd>/<kbd>2</kbd> weapon</li>
+          <li><kbd>Tab</kbd> scores</li>
+          <li><kbd>Y</kbd> chat</li>
+          <li><kbd>Esc</kbd> release mouse</li>
+        </ul>
+      </div>
+    </div>
+
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

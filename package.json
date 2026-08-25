@@ -1,0 +1,47 @@
+{
+  "name": "counterstrike",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A browser-based multiplayer FPS running on Cloudflare Workers + Durable Objects.",
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:client": "vite",
+    "dev:worker": "wrangler dev",
+    "build": "npm run build:client && npm run build:worker",
+    "build:client": "vite build",
+    "build:worker": "wrangler deploy --dry-run --outdir dist/worker",
+    "deploy": "npm run build:client && wrangler deploy",
+    "start": "npm run build:client && wrangler dev",
+    "typecheck": "tsc -p tsconfig.worker.json && tsc -p tsconfig.client.json && tsc -p tsconfig.node.json",
+    "cf-typegen": "wrangler types",
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "fmt": "oxfmt .",
+    "fmt:check": "oxfmt --check .",
+    "test": "node --import tsx --test \"tests/**/*.test.ts\"",
+    "check": "npm run fmt:check && npm run lint && npm run typecheck && npm run test",
+    "prepare": "husky"
+  },
+  "dependencies": {
+    "three": "^0.185.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260825.1",
+    "@types/node": "^26.3.0",
+    "@types/three": "^0.185.4",
+    "@types/ws": "^8.18.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^17.3.0",
+    "oxfmt": "^0.65.0",
+    "oxlint": "^1.80.0",
+    "tsx": "^4.23.12",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2",
+    "wrangler": "^4.125.0",
+    "ws": "^8.21.3"
+  },
+  "engines": {
+    "node": ">=20.11"
+  }
+}

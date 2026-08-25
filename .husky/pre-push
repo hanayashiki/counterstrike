@@ -1,0 +1,3 @@
+echo "▶ pre-push: typecheck + tests"
+npm run typecheck
+npm run test

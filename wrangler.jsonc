@@ -1,0 +1,50 @@
+/**
+ * Cloudflare Workers config.
+ *
+ * The match itself lives in a Durable Object (`GameRoom`): a single-threaded,
+ * strongly-consistent actor that owns the authoritative world state, runs the
+ * fixed-rate simulation tick, drives the bots, and fans snapshots out over
+ * WebSockets. The stateless Worker in front of it just routes: `/ws` upgrades
+ * into a room, everything else is served from the built client bundle.
+ */
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "counterstrike",
+  "main": "src/worker/index.ts",
+  "compatibility_date": "2026-08-01",
+
+  "assets": {
+    "directory": "./dist/client",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+  },
+
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "GAME_ROOM",
+        "class_name": "GameRoom",
+      },
+    ],
+  },
+
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["GameRoom"],
+    },
+  ],
+
+  "observability": {
+    "enabled": true,
+  },
+
+  "vars": {
+    "TARGET_PLAYERS": "10",
+    "BOT_SKILL": "normal",
+  },
+
+  "dev": {
+    "port": 8787,
+  },
+}

@@ -1,0 +1,58 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "oxc", "promise", "import"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "perf": "warn",
+    "pedantic": "off",
+    "style": "off"
+  },
+  "env": {
+    "builtin": true,
+    "es2024": true
+  },
+  "ignorePatterns": ["dist/**", "node_modules/**", ".wrangler/**"],
+  "rules": {
+    "eqeqeq": [
+      "error",
+      "always",
+      {
+        "null": "ignore"
+      }
+    ],
+    "no-console": "off",
+    "no-var": "error",
+    "prefer-const": "error",
+    "no-throw-literal": "error",
+    "typescript/no-explicit-any": "error",
+    "typescript/consistent-type-imports": [
+      "error",
+      {
+        "prefer": "type-imports",
+        "fixStyle": "inline-type-imports"
+      }
+    ],
+    "typescript/no-non-null-assertion": "warn",
+    "unicorn/prefer-node-protocol": "error",
+    "unicorn/no-array-for-each": "off",
+    "unicorn/no-null": "off",
+    "unicorn/number-literal-case": "off",
+    "import/no-duplicates": "error",
+    "no-underscore-dangle": "off"
+  },
+  "overrides": [
+    {
+      "files": ["src/client/**/*.ts"],
+      "env": {
+        "browser": true
+      }
+    },
+    {
+      "files": ["src/server/**/*.ts", "scripts/**/*.mjs", "tests/**/*.ts"],
+      "env": {
+        "node": true
+      }
+    }
+  ]
+}

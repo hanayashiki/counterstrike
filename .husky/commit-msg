@@ -1,0 +1,7 @@
+# Conventional-ish commit message guard: <type>(<scope>): <subject>
+msg_file="$1"
+head -1 "$msg_file" | grep -qE '^(feat|fix|perf|refactor|docs|test|build|ci|chore|style|revert)(\([a-z0-9 ._/-]+\))?!?: .{3,}' || {
+  echo "✖ Commit message must look like: feat(server): add lag compensation"
+  echo "  types: feat|fix|perf|refactor|docs|test|build|ci|chore|style|revert"
+  exit 1
+}
