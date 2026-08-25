@@ -5,9 +5,11 @@
  * no cross-instance synchronisation, and every WebSocket for a match lands on
  * the same object.
  *
- * The object stays resident while at least one player is connected. When the
- * last human leaves, the tick loop stops and the world is dropped so the
- * runtime can evict us; the next connection rebuilds it from scratch.
+ * The object steps the world while at least one player is connected. When the
+ * last one leaves the match freezes in place - not simulated, just held - and
+ * is discarded after IDLE_SHUTDOWN_MS so the runtime can evict us. Reconnect
+ * inside that window and you resume the same scoreline; after it, the next
+ * connection rebuilds the match from scratch.
  */
 import { createBot } from '../game/bot';
 import { type BotSkill, GameWorld, TICK_MS, emptySnapshot } from '../game/world';
@@ -45,7 +47,11 @@ const SNAPSHOT_INTERVAL_MS = 1000 / SNAPSHOT_RATE;
 const LOOP_INTERVAL_MS = 8;
 /** Cap on catch-up ticks per callback so a slow frame cannot snowball. */
 const MAX_TICKS_PER_CALLBACK = 5;
-/** Stop the loop after this long with nobody connected. */
+/**
+ * How long a match is held in memory after the last player leaves. The world is
+ * frozen for this long rather than simulated, so a quick reconnect resumes the
+ * exact scoreline instead of rejoining a match that drifted without them.
+ */
 const IDLE_SHUTDOWN_MS = 15_000;
 
 const VALID_SKILLS = new Set<string>(['easy', 'normal', 'hard', 'elite']);
@@ -209,6 +215,27 @@ export class GameRoom implements DurableObject {
     // as one, so elapsed time does advance here. The fallback keeps the loop
     // running even if two callbacks ever observe the same instant.
     const now = Date.now();
+
+    if (this.sessions.size === 0) {
+      // Nobody is watching. Freeze the match rather than simulating it: the
+      // bots would otherwise fight on at full tick rate for the whole grace
+      // window, burning CPU on a game with no observers.
+      if (this.emptySinceMs === 0) this.emptySinceMs = now;
+      else if (now - this.emptySinceMs > IDLE_SHUTDOWN_MS) this.stopLoop();
+      this.lastWallClockMs = now;
+      this.accumulatorMs = 0;
+      return;
+    }
+
+    if (this.emptySinceMs !== 0) {
+      // Someone reconnected inside the grace window. Pick up where we stopped
+      // instead of fast-forwarding through the frozen time.
+      this.emptySinceMs = 0;
+      this.lastWallClockMs = now;
+      this.accumulatorMs = 0;
+      this.snapshotAccumulatorMs = 0;
+    }
+
     let elapsed = now - this.lastWallClockMs;
     if (!(elapsed > 0)) elapsed = LOOP_INTERVAL_MS;
     this.lastWallClockMs = now;
@@ -231,13 +258,6 @@ export class GameRoom implements DurableObject {
         this.broadcastSnapshots(world);
         world.clearEvents();
       }
-    }
-
-    if (this.sessions.size === 0) {
-      if (this.emptySinceMs === 0) this.emptySinceMs = now;
-      else if (now - this.emptySinceMs > IDLE_SHUTDOWN_MS) this.stopLoop();
-    } else {
-      this.emptySinceMs = 0;
     }
   }
 

@@ -54,8 +54,10 @@ Two deliberate choices are worth calling out:
 
 - **No WebSocket hibernation.** Hibernation lets a DO be evicted between
   messages, which would throw away the in-memory world. A match needs a
-  continuously running tick, so the object stays resident and shuts its loop
-  down 15 s after the last player leaves.
+  continuously running tick, so the object stays resident while anyone is
+  connected. When the last player leaves the match **freezes** rather than
+  playing on to an empty room, and is discarded 15 s later. Reconnect inside
+  that window and you resume the exact scoreline you left.
 - **Tick-derived time, not wall-clock.** `world.timeMs` is `tick * TICK_MS`.
   Workers pin `Date.now()` between I/O events, so wall-clock is only used to
   decide *how many* ticks to run, never as the simulation clock.
@@ -243,9 +245,11 @@ storage flavour, which is what makes Durable Objects usable outside the paid
 plan. Be aware that this design is unlike a normal request-driven DO: the tick
 loop keeps the object resident for the whole match, so it bills Durable Object
 **duration** continuously while anyone is connected, not just per request. The
-loop stops 15 s after the last player disconnects (`IDLE_SHUTDOWN_MS`), which is
-what keeps an idle room from costing anything. An empty room costs nothing
-because the object is never created until someone opens a socket.
+simulation stops the moment the last player disconnects and the world is
+dropped 15 s later (`IDLE_SHUTDOWN_MS`), so an abandoned room stops costing CPU
+immediately rather than letting the bots fight on unobserved. An empty room
+costs nothing at all, because the object is never created until someone opens a
+socket.
 
 ## Known limitations
 
