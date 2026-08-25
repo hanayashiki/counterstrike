@@ -221,9 +221,17 @@ npx wrangler login
 npm run deploy
 ```
 
-Durable Objects are a paid-plan feature. The class is declared as
-`new_sqlite_classes`, which is the current requirement. `GET /api/status?room=x`
-returns a live JSON scoreboard for a room without joining it.
+`GET /api/status?room=x` returns a live JSON scoreboard for a room without
+joining it.
+
+**On cost.** The class is declared as `new_sqlite_classes`, the SQLite-backed
+storage flavour, which is what makes Durable Objects usable outside the paid
+plan. Be aware that this design is unlike a normal request-driven DO: the tick
+loop keeps the object resident for the whole match, so it bills Durable Object
+**duration** continuously while anyone is connected, not just per request. The
+loop stops 15 s after the last player disconnects (`IDLE_SHUTDOWN_MS`), which is
+what keeps an idle room from costing anything. An empty room costs nothing
+because the object is never created until someone opens a socket.
 
 ## Known limitations
 
