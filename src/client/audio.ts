@@ -44,6 +44,15 @@ const SHOT_VOICES: Record<number, ShotVoice> = {
     thump: 95,
     gain: 0.72,
   },
+  [WeaponId.Shotgun]: {
+    duration: 0.34,
+    bandpass: 620,
+    bandQ: 0.55,
+    lowpassFrom: 6500,
+    lowpassTo: 260,
+    thump: 76,
+    gain: 0.88,
+  },
   [WeaponId.Sniper]: {
     duration: 0.55,
     bandpass: 780,

@@ -57,8 +57,9 @@ import {
 import {
   HitZone,
   WeaponId,
+  cyclesAfterShot,
   damageAtDistance,
-  fireIntervalMs,
+  shotDelayMs,
   zoneMultiplier,
 } from '../shared/weapons';
 import { Combatant, type HistoryFrame } from './combatant';
@@ -222,6 +223,7 @@ export class GameWorld {
       WeaponId.Smg,
       WeaponId.Rifle,
       WeaponId.Sniper,
+      WeaponId.Shotgun,
     ]);
     const combatant = this.addPlayer(pickBotName(this.takenNames()), true, -1, loadout);
     this.bots.push(
@@ -508,6 +510,7 @@ export class GameWorld {
       slot.ammo += taken;
       slot.reserve -= taken;
       c.reloadEndsAtMs = 0;
+      c.shotsSinceCycle = 0;
     }
 
     const wantsReload = (cmd.buttons & BTN_RELOAD) !== 0;
@@ -537,7 +540,9 @@ export class GameWorld {
     }
 
     slot.ammo--;
-    c.nextFireAtMs = this.timeMs + fireIntervalMs(def);
+    c.shotsSinceCycle++;
+    c.nextFireAtMs = this.timeMs + shotDelayMs(def, c.shotsSinceCycle);
+    if (cyclesAfterShot(def, c.shotsSinceCycle)) c.shotsSinceCycle = 0;
     c.firingUntilMs = this.timeMs + 90;
     this.fireShot(c, cmd);
     c.spread = Math.min(def.spreadMax, c.spread + def.spreadPerShot);

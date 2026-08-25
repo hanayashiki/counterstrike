@@ -89,6 +89,16 @@ export function buildWeaponModel(def: WeaponDef): WeaponModel {
     scope.add(lens);
   }
 
+  if (def.id === WeaponId.Shotgun) {
+    // Bullpup double-barrel: two stacked tubes, a chunky forward grip, and a
+    // shell body behind the trigger.
+    block(root, GUNMETAL, 0.036, 0.036, length * 0.62, 0, 0.038, -length * 0.5);
+    block(root, GUNMETAL, 0.036, 0.036, length * 0.62, 0, -0.012, -length * 0.5);
+    block(root, POLYMER, 0.062, 0.11, length * 0.34, 0, 0.005, length * 0.14);
+    block(root, POLYMER, 0.05, 0.1, 0.055, 0, -0.075, -length * 0.34, -0.1);
+    block(root, ACCENT, 0.05, 0.012, 0.05, 0, 0.062, -length * 0.24);
+  }
+
   if (def.id === WeaponId.Smg) {
     block(root, ACCENT, 0.066, 0.014, 0.07, 0, 0.048, -length * 0.02);
   }

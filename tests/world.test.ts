@@ -15,7 +15,7 @@ import {
 import { TEAM_BLUE, TEAM_RED } from '../src/shared/map';
 import { anglesFromForward, vec3 } from '../src/shared/math';
 import { EventKind, type InputCommand, MatchPhase, PF_ALIVE } from '../src/shared/protocol';
-import { WeaponId } from '../src/shared/weapons';
+import { WeaponId, getWeapon } from '../src/shared/weapons';
 
 const ticksFor = (seconds: number): number => Math.round((seconds * 1000) / TICK_MS);
 
@@ -350,6 +350,66 @@ test('the server traces shots from the leaned eye, not the hull centre', () => {
     shot.ox - OPEN_X > 0.3,
     'the shot origin must be meaningfully displaced from the hull centre',
   );
+});
+
+test('the DBS fires a nine-pellet spread and racks after every second shell', () => {
+  const world = makeWorld(2, 77);
+  const shooter = world.addPlayer('Slugger', false, TEAM_RED, WeaponId.Shotgun);
+  const enemy = world.addPlayer('Target', false, TEAM_BLUE, WeaponId.Rifle);
+  place(shooter, OPEN_X, OPEN_Z);
+  place(enemy, OPEN_X, OPEN_Z + 4);
+  for (let i = 0; i < 4; i++) {
+    world.step();
+    place(shooter, OPEN_X, OPEN_Z);
+    place(enemy, OPEN_X, OPEN_Z + 4);
+  }
+  world.clearEvents();
+
+  const aim = aimAt(shooter, OPEN_X, 1.2, OPEN_Z + 4);
+  const snapshot = emptySnapshot();
+
+  const pullTrigger = (seq: number): number => {
+    shooter.triggerWasDown = false;
+    world.queueInput(shooter.id, [attackCommand(seq, aim.yaw, aim.pitch)]);
+    world.step();
+    place(shooter, OPEN_X, OPEN_Z);
+    place(enemy, OPEN_X, OPEN_Z + 4);
+    world.buildSnapshot(shooter.id, snapshot);
+    const shots = snapshot.events.filter((e) => e.kind === EventKind.Shot).length;
+    world.clearEvents();
+    return shots;
+  };
+
+  // One trigger pull, one shell, nine pellets down range.
+  assert.equal(pullTrigger(1), 9, 'a shell should throw nine pellets');
+  assert.equal(shooter.weapon.ammo, 13, 'exactly one shell consumed');
+  assert.ok(enemy.health < MAX_HEALTH, 'a point-blank shell should hurt');
+
+  // The second shell of the pair fires quickly...
+  const fireInterval = 60000 / getWeapon(WeaponId.Shotgun).rpm;
+  for (let i = 0; i < Math.ceil(fireInterval / TICK_MS) + 1; i++) {
+    world.step();
+    place(shooter, OPEN_X, OPEN_Z);
+  }
+  assert.equal(pullTrigger(2), 9, 'the second barrel should be ready');
+  assert.equal(shooter.weapon.ammo, 12);
+
+  // ...and then the pump has to be racked before a third.
+  for (let i = 0; i < Math.ceil(fireInterval / TICK_MS) + 1; i++) {
+    world.step();
+    place(shooter, OPEN_X, OPEN_Z);
+  }
+  assert.equal(pullTrigger(3), 0, 'the third shell must wait for the pump');
+  assert.equal(shooter.weapon.ammo, 12, 'a stalled action must not consume a shell');
+
+  // Once the rack completes it fires again.
+  const cycle = getWeapon(WeaponId.Shotgun).burstCycleMs;
+  for (let i = 0; i < Math.ceil(cycle / TICK_MS) + 2; i++) {
+    world.step();
+    place(shooter, OPEN_X, OPEN_Z);
+  }
+  assert.equal(pullTrigger(4), 9, 'the pump should have cycled by now');
+  assert.equal(shooter.weapon.ammo, 11);
 });
 
 test('lag compensation rewinds a moving target to where the shooter saw it', () => {

@@ -158,8 +158,16 @@ controls how full a room is kept.
 ## Gameplay
 
 Team deathmatch, Raiders vs Sentinels, first to `SCORE_LIMIT` kills or the round
-clock. Four weapons (rifle, SMG, bolt-action, pistol) plus a sidearm slot, with
-per-weapon spread, recoil, falloff and movement penalties. Armor absorbs 45% of
+clock. Five weapons — rifle, SMG, bolt-action, DBS shotgun, and a pistol in the
+sidearm slot — with per-weapon spread, recoil, falloff and movement penalties.
+
+The **DBS** is modelled on PUBG's double-barrel bullpup: nine pellets a shell,
+fourteen shells, and an action that racks after every *second* shell, so it
+fires a fast pair and then stalls for ~0.7 s. Its falloff curve is fitted to the
+source data (26 damage per pellet at the muzzle, 18.1 at 10 m) and it is spent
+past 25 m. Weapons can declare a `burstSize`/`burstCycleMs`, applied identically
+by the server and by client prediction so the stall lands on the same frame in
+both. Armor absorbs 45% of
 non-leg damage. Headshots, assists, killfeed, damage direction indicators, fall
 damage, spawn protection.
 

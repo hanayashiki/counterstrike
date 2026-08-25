@@ -387,7 +387,14 @@ export class BotController implements BotBrain {
     }
 
     // Positioning: hold a comfortable range for the equipped weapon.
-    const preferred = def.id === WeaponId.Sniper ? 30 : def.id === WeaponId.Smg ? 8 : 16;
+    const preferred =
+      def.id === WeaponId.Sniper
+        ? 30
+        : def.id === WeaponId.Shotgun
+          ? 5
+          : def.id === WeaponId.Smg
+            ? 8
+            : 16;
     let moveZ = 0;
     let moveX = 0;
 

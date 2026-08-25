@@ -69,6 +69,8 @@ export class Combatant {
 
   nextFireAtMs = 0;
   reloadEndsAtMs = 0;
+  /** Shells fired since the action last cycled (the DBS racks every two). */
+  shotsSinceCycle = 0;
   /** Extra cone half-angle accumulated from firing, in radians. */
   spread = 0;
   triggerWasDown = false;
@@ -151,6 +153,7 @@ export class Combatant {
     }
     this.reloadEndsAtMs = 0;
     this.spread = 0;
+    this.shotsSinceCycle = 0;
     this.activeSlot = 0;
   }
 

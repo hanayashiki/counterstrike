@@ -12,7 +12,13 @@ import { ACCURATE_MOVE_SPEED, PLAYER_HEIGHT } from '../shared/config';
 import { type Vec3, clamp, vec3 } from '../shared/math';
 import { type MoveInput, type MoveState, horizontalSpeed, stepMovement } from '../shared/movement';
 import { type InputCommand, type LocalSnapshot, PF_ALIVE } from '../shared/protocol';
-import { type WeaponDef, WeaponId, fireIntervalMs, getWeapon } from '../shared/weapons';
+import {
+  type WeaponDef,
+  WeaponId,
+  cyclesAfterShot,
+  getWeapon,
+  shotDelayMs,
+} from '../shared/weapons';
 
 /** Errors larger than this are snapped rather than smoothed away. */
 const MAX_SMOOTHED_ERROR = 1.5;
@@ -53,6 +59,7 @@ export class LocalPlayer {
   spread = 0;
   reloadEndsAtMs = 0;
   private nextFireAtMs = 0;
+  private shotsSinceCycle = 0;
   private triggerWasDown = false;
   private lastFireMs = 0;
   private localTimeMs = 0;
@@ -152,6 +159,7 @@ export class LocalPlayer {
       this.ammo += taken;
       this.reserve -= taken;
       this.reloadEndsAtMs = 0;
+      this.shotsSinceCycle = 0;
       this.events.onLocalReloadEnd(def);
     }
 
@@ -184,7 +192,9 @@ export class LocalPlayer {
         }
       } else {
         this.ammo--;
-        this.nextFireAtMs = now + fireIntervalMs(def);
+        this.shotsSinceCycle++;
+        this.nextFireAtMs = now + shotDelayMs(def, this.shotsSinceCycle);
+        if (cyclesAfterShot(def, this.shotsSinceCycle)) this.shotsSinceCycle = 0;
         this.lastFireMs = now;
         this.lastPredictedShotSeq = this.seq;
         this.spread = Math.min(def.spreadMax, this.spread + def.spreadPerShot);
@@ -306,6 +316,7 @@ export class LocalPlayer {
     this.reloadEndsAtMs = 0;
     this.recoilPitch = 0;
     this.recoilYaw = 0;
+    this.shotsSinceCycle = 0;
     this.state.lean = 0;
     this.errorOffset.x = 0;
     this.errorOffset.y = 0;

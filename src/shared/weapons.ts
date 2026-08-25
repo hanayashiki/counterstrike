@@ -5,6 +5,7 @@ export const enum WeaponId {
   Smg = 1,
   Rifle = 2,
   Sniper = 3,
+  Shotgun = 4,
 }
 
 export interface WeaponDef {
@@ -18,6 +19,14 @@ export interface WeaponDef {
   readonly rpm: number;
   readonly automatic: boolean;
   readonly pellets: number;
+  /**
+   * Rounds that can be fired before the action has to cycle. 0 means the weapon
+   * never stalls, which is every weapon except the DBS - it racks its pump
+   * after each pair of shells.
+   */
+  readonly burstSize: number;
+  /** Delay imposed once `burstSize` rounds have been fired, in ms. */
+  readonly burstCycleMs: number;
   readonly magSize: number;
   readonly reserveAmmo: number;
   readonly reloadMs: number;
@@ -61,6 +70,8 @@ export const WEAPONS: readonly WeaponDef[] = [
     rpm: 420,
     automatic: false,
     pellets: 1,
+    burstSize: 0,
+    burstCycleMs: 0,
     magSize: 12,
     reserveAmmo: 72,
     reloadMs: 1750,
@@ -93,6 +104,8 @@ export const WEAPONS: readonly WeaponDef[] = [
     rpm: 880,
     automatic: true,
     pellets: 1,
+    burstSize: 0,
+    burstCycleMs: 0,
     magSize: 32,
     reserveAmmo: 128,
     reloadMs: 2050,
@@ -125,6 +138,8 @@ export const WEAPONS: readonly WeaponDef[] = [
     rpm: 600,
     automatic: true,
     pellets: 1,
+    burstSize: 0,
+    burstCycleMs: 0,
     magSize: 30,
     reserveAmmo: 90,
     reloadMs: 2400,
@@ -157,6 +172,8 @@ export const WEAPONS: readonly WeaponDef[] = [
     rpm: 45,
     automatic: false,
     pellets: 1,
+    burstSize: 0,
+    burstCycleMs: 0,
     magSize: 5,
     reserveAmmo: 25,
     reloadMs: 3400,
@@ -179,6 +196,49 @@ export const WEAPONS: readonly WeaponDef[] = [
     tracerColor: 0xffffff,
     modelLength: 0.86,
   },
+  {
+    // Modelled on PUBG's DBS (a DP-12): a double-barrel bullpup that racks its
+    // pump after every two shells, so it fires a fast pair and then stalls.
+    // Nine pellets of 12 gauge - the largest burst in the game - paid for with
+    // a punishing reload once all fourteen shells are gone.
+    id: WeaponId.Shotgun,
+    name: 'DBS Bullpup',
+    shortName: 'DBS',
+    damage: 20,
+    // Nine pellets at 4x would be absurd, so the head bonus is modest; the
+    // gun's lethality is already in the pellet count.
+    headshotMultiplier: 1.6,
+    legMultiplier: 0.85,
+    rpm: 340,
+    automatic: false,
+    pellets: 9,
+    burstSize: 2,
+    burstCycleMs: 720,
+    magSize: 14,
+    reserveAmmo: 42,
+    reloadMs: 4600,
+    spreadBase: 0.046,
+    spreadPerShot: 0.014,
+    spreadMax: 0.1,
+    spreadRecoveryPerSec: 0.24,
+    moveInaccuracy: 0.01,
+    airInaccuracy: 0.05,
+    recoilVertical: 0.042,
+    recoilHorizontal: 0.012,
+    recoilRecoveryPerSec: 0.24,
+    // Short and brutal. The source data has a pellet drop from 26 at the
+    // muzzle to 18.1 at 10 m - a ~30% loss - and nothing much past 25 m, so
+    // the curve is tuned to land on that ratio rather than to a round number.
+    range: 24,
+    falloffStart: 2,
+    falloffMin: 0.2,
+    moveSpeedMultiplier: 0.9,
+    adsSpreadMultiplier: 0.74,
+    adsFov: 66,
+    scoped: false,
+    tracerColor: 0xffc98a,
+    modelLength: 0.58,
+  },
 ];
 
 export const WEAPON_COUNT = WEAPONS.length;
@@ -188,6 +248,20 @@ export function getWeapon(id: number): WeaponDef {
 }
 
 export const fireIntervalMs = (w: WeaponDef): number => 60000 / w.rpm;
+
+/**
+ * Delay owed after firing `shotsSinceCycle` rounds. For most weapons this is
+ * just the fire interval; for the DBS, every second shell also racks the pump.
+ * Shared so the server and the client's prediction stall at the same moment.
+ */
+export function shotDelayMs(w: WeaponDef, shotsSinceCycle: number): number {
+  if (w.burstSize > 0 && shotsSinceCycle >= w.burstSize) return w.burstCycleMs;
+  return fireIntervalMs(w);
+}
+
+/** Does this shot leave the action needing a cycle? */
+export const cyclesAfterShot = (w: WeaponDef, shotsSinceCycle: number): boolean =>
+  w.burstSize > 0 && shotsSinceCycle >= w.burstSize;
 
 /** Linear damage falloff between `falloffStart` and `range`. */
 export function damageAtDistance(w: WeaponDef, distance: number): number {

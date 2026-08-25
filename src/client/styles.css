@@ -622,11 +622,13 @@ table.sb tr.dead td {
 
 .choices {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
 }
 
 .choices button {
-  flex: 1;
+  flex: 1 1 44%;
+  min-width: 84px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--edge);
   border-radius: 7px;
