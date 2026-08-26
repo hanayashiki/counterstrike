@@ -8,7 +8,12 @@
 import * as THREE from 'three';
 
 import { buildFigure } from '../client/render/figure';
-import { type ModelInstance, instantiate, loadModel } from '../client/render/model';
+import {
+  type ModelInstance,
+  instantiate,
+  loadModel,
+  parseModelBase64,
+} from '../client/render/model';
 import { CHARACTERS, headHeight, shoulderHipRatio } from '../shared/characters';
 import { PLAYER_HEIGHT, PLAYER_RADIUS } from '../shared/config';
 import { TEAM_COLORS } from '../shared/map';
@@ -112,9 +117,11 @@ modelLabel.className = 'label';
 modelLabel.innerHTML = '<b>CesiumMan</b><span>downloaded · rigged</span>';
 
 void (async () => {
-  const loaded = await loadModel(MODEL_URL);
+  const loaded = EMBEDDED
+    ? await parseModelBase64('embedded', EMBEDDED)
+    : await loadModel(MODEL_URL);
   if (!loaded) {
-    modelLabel.innerHTML = '<b>no model</b><span>asset unavailable</span>';
+    modelLabel.innerHTML = '<b>no model</b><span>failed to load — see console</span>';
     return;
   }
   modelInstance = instantiate(loaded, TEAM_COLORS[0]);

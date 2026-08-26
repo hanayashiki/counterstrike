@@ -44,48 +44,7 @@ export function loadModel(url: string): Promise<LoadedModel | null> {
 
   const pending = loader
     .loadAsync(url)
-    .then((gltf) => {
-      const scene = gltf.scene;
-      scene.updateMatrixWorld(true);
-
-      const box = new THREE.Box3().setFromObject(scene);
-      const size = new THREE.Vector3();
-      box.getSize(size);
-      if (!(size.y > 0.01)) throw new Error(`${url} has no height`);
-
-      // Some exports are Z-up; if the figure is lying down, stand it up first.
-      if (size.z > size.y * 1.4) {
-        scene.rotateX(-Math.PI / 2);
-        scene.updateMatrixWorld(true);
-        box.setFromObject(scene);
-        box.getSize(size);
-      }
-
-      const scale = PLAYER_HEIGHT / size.y;
-      const wrapper = new THREE.Group();
-      scene.scale.multiplyScalar(scale);
-      scene.position.set(
-        -((box.min.x + box.max.x) / 2) * scale,
-        -box.min.y * scale,
-        -((box.min.z + box.max.z) / 2) * scale,
-      );
-      wrapper.add(scene);
-
-      wrapper.traverse((object) => {
-        if (object instanceof THREE.Mesh) {
-          object.castShadow = true;
-          object.receiveShadow = false;
-          // Test assets often ship single-sided and unlit-ish; make them read
-          // under the game's lighting.
-          const material = object.material as THREE.Material;
-          if (material instanceof THREE.MeshStandardMaterial) material.roughness = 0.82;
-        }
-      });
-
-      const loaded: LoadedModel = { scene: wrapper, animations: gltf.animations };
-      resolved.set(url, loaded);
-      return loaded;
-    })
+    .then((gltf) => normalise(url, gltf))
     .catch((error: unknown) => {
       console.warn(`character model ${url} unavailable, using the procedural figure`, error);
       return null;
@@ -93,6 +52,88 @@ export function loadModel(url: string): Promise<LoadedModel | null> {
 
   cache.set(url, pending);
   return pending;
+}
+
+/**
+ * Parse a model already held in memory.
+ *
+ * `loadModel` goes through GLTFLoader's FileLoader, which calls `fetch` — and a
+ * sandbox with a strict `connect-src` will refuse that even for a `data:` URI.
+ * Parsing an ArrayBuffer we already have touches the network not at all, which
+ * is what makes the single-file build work when opened straight off disk.
+ */
+export function parseModel(key: string, data: ArrayBuffer): Promise<LoadedModel | null> {
+  const existing = cache.get(key);
+  if (existing) return existing;
+
+  const pending = new Promise<LoadedModel | null>((resolve) => {
+    loader.parse(
+      data,
+      '',
+      (gltf) => resolve(normalise(key, gltf)),
+      (error: unknown) => {
+        console.warn(`character model ${key} failed to parse`, error);
+        resolve(null);
+      },
+    );
+  });
+
+  cache.set(key, pending);
+  return pending;
+}
+
+/** Decode a base64 payload embedded in the page into a model. */
+export function parseModelBase64(key: string, base64: string): Promise<LoadedModel | null> {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return parseModel(key, bytes.buffer);
+}
+
+/**
+ * Stand the model up, scale it to the hull, and put its feet at the origin, so
+ * the rest of the renderer never has to know what units it was authored in.
+ */
+function normalise(
+  key: string,
+  gltf: { scene: THREE.Group; animations: THREE.AnimationClip[] },
+): LoadedModel {
+  const scene = gltf.scene;
+  scene.updateMatrixWorld(true);
+
+  const box = new THREE.Box3().setFromObject(scene);
+  const size = new THREE.Vector3();
+  box.getSize(size);
+  if (!(size.y > 0.01)) throw new Error(`${key} has no height`);
+
+  // Some exports are Z-up; if the figure is lying down, stand it up first.
+  if (size.z > size.y * 1.4) {
+    scene.rotateX(-Math.PI / 2);
+    scene.updateMatrixWorld(true);
+    box.setFromObject(scene);
+    box.getSize(size);
+  }
+
+  const scale = PLAYER_HEIGHT / size.y;
+  scene.scale.multiplyScalar(scale);
+  scene.position.set(
+    -((box.min.x + box.max.x) / 2) * scale,
+    -box.min.y * scale,
+    -((box.min.z + box.max.z) / 2) * scale,
+  );
+
+  const wrapper = new THREE.Group();
+  wrapper.add(scene);
+  wrapper.traverse((object) => {
+    if (!(object instanceof THREE.Mesh)) return;
+    object.castShadow = true;
+    const material = object.material;
+    if (material instanceof THREE.MeshStandardMaterial) material.roughness = 0.82;
+  });
+
+  const loaded: LoadedModel = { scene: wrapper, animations: gltf.animations };
+  resolved.set(key, loaded);
+  return loaded;
 }
 
 /** Load every distinct model up front so nobody pops in mid-match. */

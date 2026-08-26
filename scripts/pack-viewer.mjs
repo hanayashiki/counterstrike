@@ -28,7 +28,7 @@ const styles = readFileSync('src/viewer/styles.css', 'utf8');
 let modelGlobal = '';
 try {
   const glb = readFileSync('src/client/public/models/CesiumMan.glb');
-  modelGlobal = `<script>globalThis.__MODEL_URL__ = "data:model/gltf-binary;base64,${glb.toString('base64')}";</script>\n`;
+  modelGlobal = `<script>globalThis.__MODEL_B64__ = "${glb.toString('base64')}";</script>\n`;
   console.log(`inlined model: ${(glb.length / 1024).toFixed(0)} KB`);
 } catch {
   console.log('no model to inline; the viewer will show procedural figures only');
@@ -48,3 +48,4 @@ ${js}
 
 writeFileSync('dist/viewer/standalone.html', page);
 console.log(`packed -> dist/viewer/standalone.html (${(page.length / 1024).toFixed(0)} KB)`);
+console.log(`open it with:  open ${process.cwd()}/dist/viewer/standalone.html`);

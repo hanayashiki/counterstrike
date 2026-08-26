@@ -22,7 +22,8 @@
     "test": "node --import tsx --test \"tests/**/*.test.ts\"",
     "check": "npm run fmt:check && npm run lint && npm run typecheck && npm run test",
     "prepare": "husky",
-    "viewer": "vite build --config vite.viewer.config.ts && node scripts/pack-viewer.mjs"
+    "viewer": "vite build --config vite.viewer.config.ts && node scripts/pack-viewer.mjs",
+    "viewer:dev": "vite --config vite.viewer.config.ts"
   },
   "dependencies": {
     "three": "^0.185.1"

@@ -282,10 +282,18 @@ rather than boxes, on an articulated skeleton so knees and elbows bend. Roughly
 | Kite | athletic | 1.08 | ponytail, light vest |
 | Wren | athletic | 1.07 | bun, hooded jacket |
 
-Run `npm run viewer` to build `dist/viewer/standalone.html`, a self-contained
-turntable of the procedural figures and the rigged model side by side — the same
-code the game calls, lit the same way, with a toggle that draws the shared
-collision hull over them.
+Two ways to inspect the characters, both local:
+
+```
+npm run viewer:dev     # live on http://localhost:5174, models over http
+npm run viewer         # -> dist/viewer/standalone.html, one file, open it
+```
+
+Both stand the procedural figures beside the rigged model, calling the same code
+the game does and lit the same way, with a toggle that draws the shared
+collision hull over them. The single-file build embeds the model as base64 and
+parses it directly rather than fetching a `data:` URI — a sandboxed page will
+refuse the fetch, and then the model silently never appears.
 
 Shoulder-to-hip ratio is the strongest silhouette cue, so the builds are
 separated on that rather than on overall size; two operators sharing a build are
