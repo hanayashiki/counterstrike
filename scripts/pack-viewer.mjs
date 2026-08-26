@@ -24,15 +24,24 @@ const body = html
 
 const styles = readFileSync('src/viewer/styles.css', 'utf8');
 
-// An Artifact cannot make any network request, so the model travels inline.
-let modelGlobal = '';
+// A single file has to carry its own assets: every model travels inline, and
+// is parsed from the payload rather than fetched, because a sandboxed page will
+// refuse a fetch even of a `data:` URI.
+const models = {};
 try {
-  const glb = readFileSync('src/client/public/models/CesiumMan.glb');
-  modelGlobal = `<script>globalThis.__MODEL_B64__ = "${glb.toString('base64')}";</script>\n`;
-  console.log(`inlined model: ${(glb.length / 1024).toFixed(0)} KB`);
+  for (const file of readdirSync('src/client/public/models')) {
+    if (!file.endsWith('.glb')) continue;
+    const glb = readFileSync(`src/client/public/models/${file}`);
+    models[file] = glb.toString('base64');
+    console.log(`  inlined ${file} (${(glb.length / 1024 / 1024).toFixed(2)} MB)`);
+  }
 } catch {
-  console.log('no model to inline; the viewer will show procedural figures only');
+  console.log('no models directory; the viewer will show procedural figures only');
 }
+const modelGlobal =
+  Object.keys(models).length > 0
+    ? `<script>globalThis.__MODELS__ = ${JSON.stringify(models)};</script>\n`
+    : '';
 
 const page = `<title>cs_grid — operator models</title>
 

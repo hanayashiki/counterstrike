@@ -95,17 +95,23 @@ export class RemotePlayer {
       this.weaponRoot.removeFromParent();
       this.weaponRoot = null;
     }
-    // Rigged models have no grip node the engine knows about, so their weapon
-    // is carried on the body rather than in the hand until a model ships with
-    // a named hand bone to attach to.
     const model = cloneWeaponModel(getWeapon(weaponId));
-    if (grip) {
+    const hand = this.model?.weaponHand;
+    if (hand) {
+      // Parented to the hand bone, so the weapon follows the arm through the
+      // whole walk cycle instead of floating at a fixed offset on the body.
+      const scale = new THREE.Vector3();
+      hand.getWorldScale(scale);
+      model.root.scale.setScalar(1 / Math.max(0.001, scale.x));
+      model.root.position.set(0, -0.04, -0.02);
+      model.root.rotation.set(Math.PI / 2, 0, 0);
+      hand.add(model.root);
+    } else if (grip) {
       model.root.position.set(0, -0.02, -0.12);
       model.root.rotation.set(1.62, 0, 0);
       grip.add(model.root);
     } else {
       model.root.position.set(0.16, 1.16, -0.26);
-      model.root.rotation.set(0, 0, 0);
       this.root.add(model.root);
     }
     this.weaponRoot = model.root;
@@ -188,8 +194,7 @@ export class RemotePlayer {
     if (this.model) {
       this.model.root.scale.y = scale;
       this.model.root.position.x = lean * LEAN_DISTANCE;
-      this.model.root.rotation.z = -lean * LEAN_ROLL * 1.7;
-      this.model.update(dt, speed);
+      this.model.update(dt, speed, pitch, lean);
       return;
     }
 

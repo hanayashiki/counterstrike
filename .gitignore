@@ -6,3 +6,6 @@ dist/
 .DS_Store
 .vite/
 coverage/
+
+# Character source pack is not committed; regenerate the .glb with
+# scripts/prepare-characters.mjs

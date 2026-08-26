@@ -12,7 +12,7 @@
  */
 import * as THREE from 'three';
 
-import { MODEL_URLS } from '../shared/characters';
+import { CHARACTERS, MODEL_URLS } from '../shared/characters';
 import {
   BTN_ADS,
   EYE_OFFSET,
@@ -76,7 +76,18 @@ function wireChoices(containerId: string, initial: number): { value: number } {
 
 const teamChoice = wireChoices('menu-team', -1);
 const weaponChoice = wireChoices('menu-weapon', WeaponId.Rifle);
-const characterChoice = wireChoices('menu-character', 1);
+// Built from the registry so adding or removing an operator cannot leave the
+// menu offering one that no longer exists.
+const characterList = document.getElementById('menu-character') as HTMLElement;
+for (const character of CHARACTERS) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.dataset.value = String(character.id);
+  button.textContent = character.name;
+  if (character.id === 0) button.classList.add('active');
+  characterList.append(button);
+}
+const characterChoice = wireChoices('menu-character', 0);
 
 /**
  * What each tier actually does, in terms a player can act on. Measured over a

@@ -14,9 +14,11 @@ import {
   loadModel,
   parseModelBase64,
 } from '../client/render/model';
+import { cloneWeaponModel } from '../client/render/weapon-model';
 import { CHARACTERS, headHeight, shoulderHipRatio } from '../shared/characters';
 import { PLAYER_HEIGHT, PLAYER_RADIUS } from '../shared/config';
 import { TEAM_COLORS } from '../shared/map';
+import { WeaponId, getWeapon } from '../shared/weapons';
 
 const canvas = document.getElementById('stage') as HTMLCanvasElement;
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -65,13 +67,6 @@ scene.add(grid);
 // --------------------------------------------------------------- figures ---
 
 const SPACING = 1.35;
-/**
- * The single-file build embeds the model as base64 and parses it in page; the
- * dev server serves it over http exactly as the game does. Fetching a `data:`
- * URI would be simpler, but a sandboxed page refuses it.
- */
-const EMBEDDED = (globalThis as { __MODEL_B64__?: string }).__MODEL_B64__;
-const MODEL_URL = '/models/CesiumMan.glb';
 const figures = CHARACTERS.map((character, index) => {
   const pivot = new THREE.Group();
   pivot.position.x = (index - (CHARACTERS.length - 1) / 2) * SPACING;
@@ -97,41 +92,64 @@ const figures = CHARACTERS.map((character, index) => {
   return { character, pivot, figure, hull };
 });
 
-// The downloaded rigged model, stood beside the procedural figures so the two
-// approaches can be compared directly.
-let modelInstance: ModelInstance | null = null;
-const modelPivot = new THREE.Group();
-modelPivot.position.x = ((CHARACTERS.length - 1) / 2 + 1) * SPACING;
-scene.add(modelPivot);
+// The rigged models, stood beside the procedural fallbacks so the two can be
+// compared directly.
+const EMBEDDED = (globalThis as { __MODELS__?: Record<string, string> }).__MODELS__;
 
-const modelRing = new THREE.Mesh(
-  new THREE.RingGeometry(0.42, 0.5, 32),
-  new THREE.MeshBasicMaterial({
-    color: 0x4aa8ff,
-    transparent: true,
-    opacity: 0.55,
-    side: THREE.DoubleSide,
+const modelSlots = CHARACTERS.map((character, index) => {
+  const pivot = new THREE.Group();
+  pivot.position.x = ((CHARACTERS.length - 1) / 2 + 1 + index) * SPACING;
+  scene.add(pivot);
+
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(0.42, 0.5, 32),
+    new THREE.MeshBasicMaterial({
+      color: 0x4aa8ff,
+      transparent: true,
+      opacity: 0.5,
+      side: THREE.DoubleSide,
+    }),
+  );
+  ring.rotation.x = -Math.PI / 2;
+  ring.position.y = 0.004;
+  pivot.add(ring);
+
+  const label = document.createElement('div');
+  label.className = 'label';
+  label.innerHTML = `<b>${character.name}</b><span>rigged · ${character.build}</span>`;
+
+  return { character, pivot, label, instance: null as ModelInstance | null };
+});
+
+// Loaded in parallel: sequential awaits meant the second character was still
+// arriving when the first had already been on screen for a second.
+void Promise.all(
+  modelSlots.map(async (slot) => {
+    const url = slot.character.modelUrl;
+    if (!url) return;
+    const key = url.split('/').pop() ?? url;
+    const payload = EMBEDDED?.[key];
+    const loaded = payload ? await parseModelBase64(key, payload) : await loadModel(url);
+    if (!loaded) {
+      slot.label.innerHTML = `<b>${slot.character.name}</b><span>model failed — see console</span>`;
+      return;
+    }
+    slot.instance = instantiate(loaded, TEAM_COLORS[0]);
+    slot.pivot.add(slot.instance.root);
+
+    // Put a rifle in their hand, since the carry pose only makes sense with one.
+    const hand = slot.instance.weaponHand;
+    if (hand) {
+      const weapon = cloneWeaponModel(getWeapon(WeaponId.Rifle));
+      const scale = new THREE.Vector3();
+      hand.getWorldScale(scale);
+      weapon.root.scale.setScalar(1 / Math.max(0.001, scale.x));
+      weapon.root.position.set(0, -0.04, -0.02);
+      weapon.root.rotation.set(Math.PI / 2, 0, 0);
+      hand.add(weapon.root);
+    }
   }),
 );
-modelRing.rotation.x = -Math.PI / 2;
-modelRing.position.y = 0.004;
-modelPivot.add(modelRing);
-
-const modelLabel = document.createElement('div');
-modelLabel.className = 'label';
-modelLabel.innerHTML = '<b>CesiumMan</b><span>downloaded · rigged</span>';
-
-void (async () => {
-  const loaded = EMBEDDED
-    ? await parseModelBase64('embedded', EMBEDDED)
-    : await loadModel(MODEL_URL);
-  if (!loaded) {
-    modelLabel.innerHTML = '<b>no model</b><span>failed to load — see console</span>';
-    return;
-  }
-  modelInstance = instantiate(loaded, TEAM_COLORS[0]);
-  modelPivot.add(modelInstance.root);
-})();
 
 // ------------------------------------------------------------------- ui ----
 
@@ -171,13 +189,13 @@ const labelNodes = figures.map(({ character }) => {
   labels.append(node);
   return node;
 });
-labels.append(modelLabel);
+for (const slot of modelSlots) labels.append(slot.label);
 
 // -------------------------------------------------------------- controls ---
 
 let yaw = 0.35;
 let pitch = 0.12;
-let distance = 6.0;
+let distance = 7.2;
 let dragging = false;
 let lastX = 0;
 let lastY = 0;
@@ -208,11 +226,27 @@ canvas.addEventListener(
   { passive: false },
 );
 
+/**
+ * Capture mode (`?shot`): render a fixed number of frames then stop.
+ *
+ * A headless screenshot waits for the page to go idle, and an endless
+ * requestAnimationFrame loop never does — so without this the capture simply
+ * hangs. Stopping also makes the frame deterministic, which is what you want
+ * when comparing one build against another.
+ */
+const CAPTURE = new URLSearchParams(globalThis.location.search).has('shot');
+const CAPTURE_FRAMES = 90;
+let framesDrawn = 0;
+
 // ------------------------------------------------------------------ loop ---
 
 // Centred on all four figures, not just the procedural three, or the
 // downloaded model sits exactly on the right edge of frame.
-const target = new THREE.Vector3(((CHARACTERS.length - 1) / 2 + 1) * SPACING * 0.5, 0.95, 0);
+const target = new THREE.Vector3(
+  ((CHARACTERS.length - 1) / 2 + CHARACTERS.length) * SPACING * 0.5,
+  0.95,
+  0,
+);
 const projected = new THREE.Vector3();
 let stride = 0;
 let last = performance.now();
@@ -228,7 +262,8 @@ resize();
 globalThis.addEventListener('resize', resize);
 
 function frame(now: number): void {
-  requestAnimationFrame(frame);
+  framesDrawn++;
+  if (!CAPTURE || framesDrawn < CAPTURE_FRAMES) requestAnimationFrame(frame);
   const dt = Math.min(0.05, (now - last) / 1000);
   last = now;
 
@@ -248,11 +283,11 @@ function frame(now: number): void {
     }
   }
 
-  if (state.spin) {
+  if (state.spin && !CAPTURE) {
     for (const { pivot } of figures) pivot.rotation.y += dt * 0.55;
-    modelPivot.rotation.y += dt * 0.55;
+    for (const slot of modelSlots) slot.pivot.rotation.y += dt * 0.55;
   }
-  modelInstance?.update(dt, state.walk ? 5.2 : 0);
+  for (const slot of modelSlots) slot.instance?.update(dt, state.walk ? 5.2 : 0);
 
   camera.position.set(
     target.x + Math.sin(yaw) * Math.cos(pitch) * distance,
@@ -262,10 +297,12 @@ function frame(now: number): void {
   camera.lookAt(target);
 
   // Keep the name plates pinned under each figure.
-  projected.set(modelPivot.position.x, 0, 0).project(camera);
-  modelLabel.style.left = `${((projected.x + 1) / 2) * globalThis.innerWidth}px`;
-  modelLabel.style.top = `${((-projected.y + 1) / 2) * globalThis.innerHeight}px`;
-  modelLabel.style.opacity = projected.z < 1 ? '1' : '0';
+  for (const slot of modelSlots) {
+    projected.set(slot.pivot.position.x, 0, 0).project(camera);
+    slot.label.style.left = `${((projected.x + 1) / 2) * globalThis.innerWidth}px`;
+    slot.label.style.top = `${((-projected.y + 1) / 2) * globalThis.innerHeight}px`;
+    slot.label.style.opacity = projected.z < 1 ? '1' : '0';
+  }
 
   for (const [index, { pivot }] of figures.entries()) {
     projected.set(pivot.position.x, 0, 0).project(camera);

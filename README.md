@@ -255,20 +255,31 @@ speed and is disabled in mid-air.
 scope overlay once you aim, rather than holding the weapon in front of the
 camera — otherwise the scope body would sit in the middle of the screen.
 
-**Operators.** Rigged glTF models are loaded when present, with the procedural
-figure as the fallback — a character with no `modelUrl`, or whose asset fails to
-fetch, still renders, because the project has always been able to run with no
-art assets at all. Models are normalised on load: scaled to exactly
-`PLAYER_HEIGHT` and shifted so the feet sit at the origin, so an asset arriving
-at 1.51 m does not need the rest of the renderer to know.
+**Operators.** Two rigged characters, male and female, from Quaternius'
+[Universal Base Characters](https://quaternius.com/packs/universalbasecharacters.html)
+— CC0, public domain. 14–15k triangles on a 65-bone standard humanoid rig.
 
-The bundled model is [CesiumMan](https://github.com/KhronosGroup/glTF-Sample-Assets),
-© 2017 Cesium, [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/) — a
-Khronos sample asset, and a placeholder rather than a final character: it is one
-generic figure, so every operator currently looks the same. Dropping a
-multi-body-type pack such as [Quaternius' CC0 Universal Base Characters](https://quaternius.com/packs/universalbasecharacters.html)
-into `src/client/public/models/` and pointing each character's `modelUrl` at it
-needs no code change.
+The pack ships no animation clips, so every pose is driven on the bones: the
+arms are aimed out of their T-pose into a weapon carry, the walk swings thighs
+and knees from ground speed, and the spine and head carry aim pitch and lean.
+Bones are aimed along a **direction** rather than by setting Euler angles,
+because this rig does not mirror its local axes across the body — the naive
+`-1` on the left arm swung it outward instead of down.
+
+The source pack is 129 MB and is not committed. `scripts/prepare-characters.mjs`
+regenerates the assets from the download: it downscales the 2048px textures,
+drops the roughness maps for a constant, and packs each character into one
+self-contained `.glb` (2.25 MB and 1.96 MB, from 33 MB of source textures).
+
+```
+node scripts/prepare-characters.mjs ~/Downloads/'Universal Base Characters[Standard].zip'
+```
+
+Models are normalised on load — stood upright if the export is Z-up, scaled to
+exactly `PLAYER_HEIGHT`, feet at the origin — so an asset authored at any scale
+needs no code to know about it. Loading never rejects: a character with no
+`modelUrl`, or whose asset fails, falls back to the procedural figure, because
+this project has always been able to run with no art assets at all.
 
 **Procedural fallback.** Three figures built to real human
 landmark proportions — crotch at 49% of height, knee at 27%, shoulder at 81%,

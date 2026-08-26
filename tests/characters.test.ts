@@ -157,10 +157,10 @@ test('operators sharing a build are still told apart by their kit', () => {
 test('a character choice never reaches the simulation', () => {
   const world = new GameWorld({ targetPlayers: 2, botSkill: 'normal', seed: 99 });
   const a = world.addPlayer('A', false, 0, WeaponId.Rifle, 0);
-  const b = world.addPlayer('B', false, 1, WeaponId.Rifle, 2);
+  const b = world.addPlayer('B', false, 1, WeaponId.Rifle, CHARACTER_COUNT - 1);
 
   assert.equal(a.character, 0);
-  assert.equal(b.character, 2);
+  assert.equal(b.character, CHARACTER_COUNT - 1);
   // Nothing the simulation reads may differ because of it.
   assert.equal(a.move.height, b.move.height);
   assert.equal(a.health, b.health);
@@ -214,5 +214,17 @@ function fingerprint(character: number): number {
 }
 
 test('a match runs identically whatever models are in it', () => {
-  assert.equal(fingerprint(0), fingerprint(2), 'the model changed the simulation');
+  assert.equal(
+    fingerprint(0),
+    fingerprint(CHARACTER_COUNT - 1),
+    'the model changed the simulation',
+  );
+});
+
+test('every operator points at a rigged model, and the models are distinct', () => {
+  for (const c of CHARACTERS) {
+    assert.ok(c.modelUrl, `${c.name} has no model`);
+  }
+  const urls = CHARACTERS.map((c) => c.modelUrl);
+  assert.equal(new Set(urls).size, urls.length, 'two operators share one model');
 });
