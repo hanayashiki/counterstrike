@@ -190,14 +190,55 @@ export function buildFigure(c: CharacterDef, teamColor: number): Figure {
     owned,
   );
 
-  // Shoulder yoke, in team colour: the clearest read at distance.
-  const yoke = new THREE.CylinderGeometry(c.shoulderSpan / 2, c.chestWidth / 2, 0.12, 14, 1);
-  yoke.translate(0, chestHeight - 0.05, 0);
-  yoke.scale(1, 1, c.chestDepth / c.shoulderSpan + 0.18);
-  owned.push(yoke);
-  const yokeMesh = new THREE.Mesh(yoke, team());
-  yokeMesh.castShadow = true;
-  torso.add(yokeMesh);
+  // Shoulders. A real shoulder is two round deltoid masses at the ends of the
+  // clavicle line, not a continuous flared ring - a cone here reads as a collar
+  // or a cape, and makes the arms look like they emerge from inside it.
+  // A bar across the top of the chest, capped by the deltoids. The cylinder is
+  // laid along X by rotating about Z, which moves the RADIUS into Y and Z - so
+  // the radius sets the bar's thickness, and the height sets its span.
+  const barRadius = 0.052;
+  const clavicle = new THREE.CylinderGeometry(
+    barRadius,
+    barRadius,
+    c.shoulderSpan - c.deltoidRadius * 1.7,
+    12,
+    1,
+  );
+  clavicle.rotateZ(Math.PI / 2);
+  clavicle.scale(1, 1.02, (c.chestDepth * 0.78) / (barRadius * 2));
+  clavicle.translate(0, chestHeight - 0.035, 0);
+  owned.push(clavicle);
+  const clavicleMesh = new THREE.Mesh(clavicle, team());
+  clavicleMesh.castShadow = true;
+  torso.add(clavicleMesh);
+
+  for (const side of [-1, 1]) {
+    const deltoid = new THREE.SphereGeometry(c.deltoidRadius, 12, 9);
+    deltoid.scale(0.92, 1.05, 0.95);
+    deltoid.translate(side * (c.shoulderSpan / 2 - c.deltoidRadius * 0.9), chestHeight - 0.05, 0);
+    owned.push(deltoid);
+    const deltoidMesh = new THREE.Mesh(deltoid, team());
+    deltoidMesh.castShadow = true;
+    torso.add(deltoidMesh);
+  }
+
+  // Bust, on the builds that have one. Placed just proud of the vest line so it
+  // is part of the silhouette rather than buried under the kit.
+  if (c.bust > 0) {
+    for (const side of [-1, 1]) {
+      const breast = new THREE.SphereGeometry(c.bust, 12, 9);
+      breast.scale(1, 0.86, 0.78);
+      breast.translate(
+        side * c.chestWidth * 0.2,
+        chestHeight * 0.66,
+        -(c.chestDepth * 0.34 + c.bust * 0.34),
+      );
+      owned.push(breast);
+      const breastMesh = new THREE.Mesh(breast, FATIGUES);
+      breastMesh.castShadow = true;
+      torso.add(breastMesh);
+    }
+  }
 
   // Worn kit. This changes the outline as much as the body does, and is what
   // separates two operators who share a build.
@@ -304,20 +345,21 @@ export function buildFigure(c: CharacterDef, teamColor: number): Figure {
   const armL = makeArm(-1);
   const armR = makeArm(1);
 
-  // Rifle carry. The figure faces -Z, like every other part of the model and
-  // like `forwardFromAngles`, so the arms rotate POSITIVELY about X to come
-  // forward; negative would tuck the weapon behind the back.
+  // Rifle carry.
   //
-  // The elbows stay bent rather than extended so the hands finish inside the
-  // collision hull - a hand poking out in front would be a piece of the model
-  // that cannot be shot.
-  // These angles are the most weapon-forward carry that still keeps every
-  // model - hands included - inside the hull; found by measuring the built
-  // geometry rather than by eye.
-  armR.upper.rotation.set(1.07, 0, -0.2);
-  armR.fore.rotation.set(-1.1, 0, 0.12);
-  armL.upper.rotation.set(1.21, 0, 0.36);
-  armL.fore.rotation.set(-1.04, 0, -0.2);
+  // The figure faces -Z, so a limb rotates POSITIVELY about X to swing forward.
+  // Both segments therefore take positive angles: the upper arm hangs down and
+  // slightly forward with the elbow tucked at the ribs, and the forearm swings
+  // FORWARD AND UP from there to bring the hands to the weapon. A negative
+  // forearm angle is the mistake to avoid - that carries the hand backwards
+  // past a straight arm, which an elbow cannot do.
+  //
+  // Z rotations bring the elbows in against the body and angle the hands toward
+  // the centreline, where a weapon would be.
+  armR.upper.rotation.set(0.28, 0, -0.3);
+  armR.fore.rotation.set(0.88, 0, -0.34);
+  armL.upper.rotation.set(0.35, 0, 0.34);
+  armL.fore.rotation.set(0.7, 0, 0.38);
 
   // The weapon hangs off the leading hand.
   const grip = new THREE.Group();
@@ -352,9 +394,11 @@ function buildHair(c: CharacterDef, parent: THREE.Group, owned: THREE.BufferGeom
   const r = c.headRadius;
 
   // Every head gets a cap; only the back of it differs.
-  const cap = new THREE.SphereGeometry(r * 1.03, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.62);
-  cap.scale(0.9, 1.08, 0.98);
-  cap.translate(0, r * 0.88, 0);
+  // Only the crown: a deeper cap hides the face and turns the head into a
+  // featureless helmet.
+  const cap = new THREE.SphereGeometry(r * 1.04, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.44);
+  cap.scale(0.9, 1.05, 0.98);
+  cap.translate(0, r * 0.9, 0);
   owned.push(cap);
   const capMesh = new THREE.Mesh(cap, HAIR_MAT);
   capMesh.castShadow = true;

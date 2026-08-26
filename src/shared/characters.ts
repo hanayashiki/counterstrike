@@ -49,6 +49,11 @@ export interface CharacterDef {
   readonly neckRadius: number;
   readonly headRadius: number;
 
+  /** Bust projection forward of the ribcage. 0 on a male build. */
+  readonly bust: number;
+  /** Deltoid cap radius: the round mass that actually reads as a shoulder. */
+  readonly deltoidRadius: number;
+
   readonly hair: Hair;
   readonly gear: Gear;
 }
@@ -77,6 +82,8 @@ export const CHARACTERS: readonly CharacterDef[] = [
     calfRadius: 0.062,
     neckRadius: 0.058,
     headRadius: 0.113,
+    bust: 0,
+    deltoidRadius: 0.075,
     hair: 'crop',
     gear: 'plate',
   },
@@ -103,6 +110,8 @@ export const CHARACTERS: readonly CharacterDef[] = [
     calfRadius: 0.054,
     neckRadius: 0.047,
     headRadius: 0.109,
+    bust: 0.058,
+    deltoidRadius: 0.058,
     hair: 'ponytail',
     gear: 'vest',
   },
@@ -128,6 +137,8 @@ export const CHARACTERS: readonly CharacterDef[] = [
     calfRadius: 0.052,
     neckRadius: 0.045,
     headRadius: 0.108,
+    bust: 0.055,
+    deltoidRadius: 0.056,
     hair: 'bun',
     gear: 'jacket',
   },

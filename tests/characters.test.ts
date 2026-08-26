@@ -112,6 +112,35 @@ test('the builds read differently in silhouette', () => {
   }
 });
 
+test('only the athletic builds carry a bust, and it stays inside the hull', () => {
+  for (const c of CHARACTERS) {
+    if (c.build === 'heavy') {
+      assert.equal(c.bust, 0, `${c.name}: a heavy build should not have one`);
+      continue;
+    }
+    assert.ok(c.bust > 0, `${c.name}: an athletic build should`);
+    // Projection forward of the ribcage must not push the model out of the box.
+    assert.ok(
+      c.chestDepth / 2 + c.bust < PLAYER_RADIUS,
+      `${c.name}: chest reaches ${(c.chestDepth / 2 + c.bust).toFixed(3)} m, hull is ${PLAYER_RADIUS}`,
+    );
+    assert.ok(c.bust < c.chestWidth * 0.25, `${c.name}: out of proportion with the ribcage`);
+  }
+});
+
+test('shoulders are capped by deltoids rather than a flared collar', () => {
+  for (const c of CHARACTERS) {
+    // The deltoid has to be a mass at the end of the shoulder line, not so big
+    // that the pair of them span more than the shoulders themselves.
+    assert.ok(c.deltoidRadius > 0.04, `${c.name}: no shoulder mass`);
+    assert.ok(
+      c.deltoidRadius * 2 < c.shoulderSpan * 0.45,
+      `${c.name}: deltoids swallow the shoulder line`,
+    );
+    assert.ok(c.deltoidRadius > c.upperArmRadius, `${c.name}: shoulder thinner than the arm`);
+  }
+});
+
 test('operators sharing a build are still told apart by their kit', () => {
   // Two athletic figures differ by millimetres, so the outline has to come from
   // somewhere else: hair and worn gear.
