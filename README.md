@@ -255,14 +255,30 @@ speed and is disabled in mid-air.
 scope overlay once you aim, rather than holding the weapon in front of the
 camera — otherwise the scope body would sit in the middle of the screen.
 
-**Operators.** Three character models, picked at the menu — Bulwark (heavy
-build), Kite (athletic, ponytail) and Wren (athletic, bun) — built from the same
-procedural boxes as everything else. They are strictly cosmetic: every operator
-is simulated inside the identical hull, and `tests/characters.test.ts` asserts
-that no model exceeds it, that the models sit close enough together that the
-lean ones are not measurably harder to hit, and that a whole match plays out
-byte-identically whichever is equipped. Cosmetic randomness draws from its own
-RNG stream so that adding a visual choice cannot shift gameplay rolls.
+**Operators.** Three character models, picked at the menu, built to real human
+landmark proportions — crotch at 49% of height, knee at 27%, shoulder at 81%,
+seven and a half heads tall — from tapered cylinders with spheres at the joints
+rather than boxes, on an articulated skeleton so knees and elbows bend. Roughly
+2,400 triangles each.
+
+| | build | shoulder : hip | look |
+| --- | --- | --- | --- |
+| Bulwark | heavy | 1.35 | cropped hair, plate carrier |
+| Kite | athletic | 1.08 | ponytail, light vest |
+| Wren | athletic | 1.07 | bun, hooded jacket |
+
+Shoulder-to-hip ratio is the strongest silhouette cue, so the builds are
+separated on that rather than on overall size; two operators sharing a build are
+told apart by hair and worn kit, which changes an outline as much as the body
+under it does.
+
+They are strictly cosmetic. Everyone is simulated inside the identical hull —
+including height, which is why all three stand 1.8 m rather than varying the way
+real people do — and `tests/characters.test.ts` asserts that no model exceeds
+it, that the landmarks stack in anatomical order, that operators never share a
+hair/gear combination, and that a whole match plays out byte-identically
+whichever is equipped. Cosmetic randomness draws from its own RNG stream so that
+adding a visual choice cannot shift gameplay rolls.
 
 ## Tooling
 

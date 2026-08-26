@@ -14,9 +14,11 @@ import {
   CHARACTER_COUNT,
   characterForId,
   getCharacter,
+  headHeight,
+  shoulderHipRatio,
   widestPoint,
 } from '../src/shared/characters';
-import { PLAYER_RADIUS } from '../src/shared/config';
+import { PLAYER_HEIGHT, PLAYER_RADIUS } from '../src/shared/config';
 import { WeaponId } from '../src/shared/weapons';
 
 const HULL_WIDTH = PLAYER_RADIUS * 2;
@@ -63,26 +65,64 @@ test('the models sit inside one generous hitbox, and close to each other', () =>
 
 test('every model is anatomically coherent', () => {
   for (const c of CHARACTERS) {
-    assert.ok(c.shoulderWidth >= c.chestWidth, `${c.name}: shoulders inside the chest`);
-    assert.ok(c.chestWidth > c.waistWidth || c.build === 'heavy', `${c.name}: no waist`);
-    assert.ok(c.headWidth > 0.15 && c.headWidth < 0.35, `${c.name}: head size`);
-    assert.ok(c.legSpacing * 2 + c.legWidth <= HULL_WIDTH, `${c.name}: stance too wide`);
-    assert.ok(c.armWidth > 0 && c.legWidth > 0, `${c.name}: limbs`);
+    assert.ok(c.shoulderSpan > c.chestWidth, `${c.name}: shoulders inside the chest`);
+    assert.ok(c.chestWidth > c.waistWidth, `${c.name}: no waist`);
+    assert.ok(c.chestDepth < c.chestWidth, `${c.name}: deeper than it is wide`);
+    assert.ok(c.headRadius > 0.08 && c.headRadius < 0.16, `${c.name}: head size`);
+    assert.ok(c.upperArmRadius > c.forearmRadius, `${c.name}: forearm thicker than upper arm`);
+    assert.ok(c.thighRadius > c.calfRadius, `${c.name}: calf thicker than thigh`);
   }
 });
 
-test('the builds are actually distinguishable at a glance', () => {
+test('the vertical landmarks match human proportions', () => {
+  // Measured against standard figure-drawing landmarks for a 1.8 m adult.
+  for (const c of CHARACTERS) {
+    const h = PLAYER_HEIGHT;
+    assert.ok(c.kneeHeight / h > 0.25 && c.kneeHeight / h < 0.31, `${c.name}: knee height`);
+    assert.ok(c.hipHeight / h > 0.46 && c.hipHeight / h < 0.53, `${c.name}: hip height`);
+    assert.ok(
+      c.shoulderHeight / h > 0.78 && c.shoulderHeight / h < 0.85,
+      `${c.name}: shoulder height`,
+    );
+    // A figure is roughly seven and a half heads tall.
+    const heads = h / headHeight(c);
+    assert.ok(heads > 7.2 && heads < 7.9, `${c.name} is ${heads.toFixed(1)} heads tall`);
+
+    // The landmarks have to stack in order, or the skeleton inverts.
+    assert.ok(c.kneeHeight < c.hipHeight);
+    assert.ok(c.hipHeight < c.waistHeight);
+    assert.ok(c.waistHeight < c.shoulderHeight);
+    assert.ok(c.shoulderHeight < c.neckHeight);
+    assert.ok(c.neckHeight + headHeight(c) <= h + 0.02, `${c.name}: head pokes out of the hull`);
+  }
+});
+
+test('the builds read differently in silhouette', () => {
   const heavy = CHARACTERS.filter((c) => c.build === 'heavy');
   const athletic = CHARACTERS.filter((c) => c.build === 'athletic');
   assert.ok(heavy.length > 0 && athletic.length > 0, 'both builds should exist');
 
-  // Shoulder span is the strongest silhouette cue at gameplay distance.
-  const widestAthletic = Math.max(...athletic.map((c) => c.shoulderWidth));
-  const narrowestHeavy = Math.min(...heavy.map((c) => c.shoulderWidth));
-  assert.ok(
-    narrowestHeavy - widestAthletic > 0.05,
-    `builds differ by only ${(narrowestHeavy - widestAthletic).toFixed(3)} m at the shoulder`,
-  );
+  // Shoulder-to-hip ratio is the strongest cue: a heavy build is widest at the
+  // shoulder, an athletic one is near even.
+  for (const c of heavy) {
+    assert.ok(shoulderHipRatio(c) > 1.25, `${c.name} is not shoulder-dominant`);
+  }
+  for (const c of athletic) {
+    assert.ok(shoulderHipRatio(c) < 1.15, `${c.name} is too shoulder-dominant`);
+  }
+});
+
+test('operators sharing a build are still told apart by their kit', () => {
+  // Two athletic figures differ by millimetres, so the outline has to come from
+  // somewhere else: hair and worn gear.
+  const seen = new Map<string, string[]>();
+  for (const c of CHARACTERS) {
+    const key = `${c.hair}/${c.gear}`;
+    seen.set(key, [...(seen.get(key) ?? []), c.name]);
+  }
+  for (const [key, names] of seen) {
+    assert.equal(names.length, 1, `${names.join(' and ')} share the same look (${key})`);
+  }
 });
 
 test('a character choice never reaches the simulation', () => {

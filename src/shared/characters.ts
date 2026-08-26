@@ -1,35 +1,56 @@
 /**
- * Playable character models.
+ * Playable character models, described anatomically.
  *
- * These are purely cosmetic. Every character is simulated with the identical
- * `PLAYER_RADIUS` / `PLAYER_HEIGHT` hull, so which one you pick changes nothing
- * about how easy you are to hit — a silhouette that was narrower than the hull
- * would be an unearned advantage, and one that was wider would be a penalty.
- * `tests/characters.test.ts` enforces that.
+ * Every measurement is in metres for a standing 1.8 m figure, taken from real
+ * human landmark proportions: crotch at roughly 48% of height, knee at 27%,
+ * shoulder at 82%, and a head about 1/7.8 of total height. Building to those
+ * numbers is what makes a figure read as a person rather than a stack of boxes.
  *
- * All measurements are in metres and describe a standing 1.8 m figure.
+ * The models are cosmetic. Everyone is simulated with the identical
+ * `PLAYER_RADIUS` / `PLAYER_HEIGHT` hull, so a build cannot make you harder to
+ * hit — including height, which is why all three stand 1.8 m rather than
+ * varying the way real people do. `tests/characters.test.ts` enforces it.
+ *
+ * The strongest silhouette cue between builds is the shoulder-to-hip ratio: a
+ * heavy build is widest at the shoulder, an athletic one is close to even.
  */
 
 export type Build = 'heavy' | 'athletic';
-export type Hair = 'none' | 'ponytail' | 'bun';
+export type Hair = 'crop' | 'ponytail' | 'bun';
+/** Worn kit, which changes the outline as much as the body underneath does. */
+export type Gear = 'plate' | 'vest' | 'jacket';
 
 export interface CharacterDef {
   readonly id: number;
   readonly name: string;
   readonly build: Build;
-  /** Shoulder plate span — the strongest silhouette cue at distance. */
-  readonly shoulderWidth: number;
+
+  // Vertical landmarks, measured from the feet.
+  readonly hipHeight: number;
+  readonly kneeHeight: number;
+  readonly waistHeight: number;
+  readonly shoulderHeight: number;
+  readonly neckHeight: number;
+
+  // Girths. Width is across the body, depth is front to back.
+  readonly shoulderSpan: number;
   readonly chestWidth: number;
   readonly chestDepth: number;
-  /** Narrower than the chest on athletic builds, giving a waisted profile. */
   readonly waistWidth: number;
+  readonly waistDepth: number;
   readonly hipWidth: number;
-  readonly headWidth: number;
-  readonly armWidth: number;
-  readonly legWidth: number;
-  /** Horizontal offset of each leg from centre. */
-  readonly legSpacing: number;
+  readonly hipDepth: number;
+
+  // Limb radii.
+  readonly upperArmRadius: number;
+  readonly forearmRadius: number;
+  readonly thighRadius: number;
+  readonly calfRadius: number;
+  readonly neckRadius: number;
+  readonly headRadius: number;
+
   readonly hair: Hair;
+  readonly gear: Gear;
 }
 
 export const CHARACTERS: readonly CharacterDef[] = [
@@ -37,46 +58,78 @@ export const CHARACTERS: readonly CharacterDef[] = [
     id: 0,
     name: 'Bulwark',
     build: 'heavy',
-    shoulderWidth: 0.5,
-    chestWidth: 0.46,
-    chestDepth: 0.28,
-    waistWidth: 0.44,
-    hipWidth: 0.4,
-    headWidth: 0.25,
-    armWidth: 0.12,
-    legWidth: 0.17,
-    legSpacing: 0.13,
-    hair: 'none',
+    hipHeight: 0.88,
+    kneeHeight: 0.49,
+    waistHeight: 1.08,
+    shoulderHeight: 1.47,
+    neckHeight: 1.53,
+    // Broad at the shoulder, narrow at the hip: the classic male outline.
+    shoulderSpan: 0.46,
+    chestWidth: 0.35,
+    chestDepth: 0.245,
+    waistWidth: 0.32,
+    waistDepth: 0.22,
+    hipWidth: 0.34,
+    hipDepth: 0.23,
+    upperArmRadius: 0.058,
+    forearmRadius: 0.05,
+    thighRadius: 0.085,
+    calfRadius: 0.062,
+    neckRadius: 0.058,
+    headRadius: 0.113,
+    hair: 'crop',
+    gear: 'plate',
   },
   {
     id: 1,
     name: 'Kite',
     build: 'athletic',
-    shoulderWidth: 0.42,
-    chestWidth: 0.37,
-    chestDepth: 0.23,
-    waistWidth: 0.29,
-    hipWidth: 0.36,
-    headWidth: 0.225,
-    armWidth: 0.1,
-    legWidth: 0.145,
-    legSpacing: 0.105,
+    hipHeight: 0.9,
+    kneeHeight: 0.5,
+    waistHeight: 1.09,
+    shoulderHeight: 1.45,
+    neckHeight: 1.52,
+    // Shoulders and hips near even, with a markedly narrower waist between.
+    shoulderSpan: 0.385,
+    chestWidth: 0.3,
+    chestDepth: 0.215,
+    waistWidth: 0.25,
+    waistDepth: 0.185,
+    hipWidth: 0.355,
+    hipDepth: 0.225,
+    upperArmRadius: 0.046,
+    forearmRadius: 0.039,
+    thighRadius: 0.077,
+    calfRadius: 0.054,
+    neckRadius: 0.047,
+    headRadius: 0.109,
     hair: 'ponytail',
+    gear: 'vest',
   },
   {
     id: 2,
     name: 'Wren',
     build: 'athletic',
-    shoulderWidth: 0.41,
-    chestWidth: 0.36,
-    chestDepth: 0.225,
-    waistWidth: 0.285,
-    hipWidth: 0.355,
-    headWidth: 0.222,
-    armWidth: 0.098,
-    legWidth: 0.142,
-    legSpacing: 0.1,
+    hipHeight: 0.91,
+    kneeHeight: 0.505,
+    waistHeight: 1.1,
+    shoulderHeight: 1.44,
+    neckHeight: 1.51,
+    shoulderSpan: 0.375,
+    chestWidth: 0.29,
+    chestDepth: 0.208,
+    waistWidth: 0.243,
+    waistDepth: 0.18,
+    hipWidth: 0.35,
+    hipDepth: 0.222,
+    upperArmRadius: 0.044,
+    forearmRadius: 0.037,
+    thighRadius: 0.074,
+    calfRadius: 0.052,
+    neckRadius: 0.045,
+    headRadius: 0.108,
     hair: 'bun',
+    gear: 'jacket',
   },
 ];
 
@@ -91,5 +144,18 @@ export const characterForId = (id: number): number => id % CHARACTER_COUNT;
 
 /** Widest point of a model, used to prove it stays inside the collision hull. */
 export function widestPoint(c: CharacterDef): number {
-  return Math.max(c.shoulderWidth, c.chestWidth, c.hipWidth, c.legSpacing * 2 + c.legWidth);
+  return Math.max(c.shoulderSpan, c.chestWidth, c.hipWidth);
 }
+
+/**
+ * Vertical stretch applied to the skull sphere when the figure is built. Lives
+ * here rather than in the renderer so the proportion tests measure the head the
+ * viewer actually sees.
+ */
+export const SKULL_Y_SCALE = 1.06;
+
+/** Chin-to-crown height, the unit figure drawing measures a body in. */
+export const headHeight = (c: CharacterDef): number => c.headRadius * 2 * SKULL_Y_SCALE;
+
+/** Shoulder-to-hip ratio: above 1.2 reads as a heavy build, near 1.1 as lean. */
+export const shoulderHipRatio = (c: CharacterDef): number => c.shoulderSpan / c.hipWidth;

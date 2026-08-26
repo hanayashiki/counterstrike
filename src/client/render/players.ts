@@ -12,7 +12,6 @@ import { type CharacterDef, characterForId, getCharacter } from '../../shared/ch
 import {
   INTERP_DELAY_MS,
   LEAN_DISTANCE,
-  LEAN_DROP,
   LEAN_ROLL,
   PLAYER_HEIGHT,
   PLAYER_RADIUS,
@@ -21,6 +20,7 @@ import { TEAM_COLORS, type TeamId } from '../../shared/map';
 import { wrapAngle } from '../../shared/math';
 import { type EntitySnapshot, PF_ALIVE, PF_CROUCH, PF_TEAM_BLUE } from '../../shared/protocol';
 import { getWeapon } from '../../shared/weapons';
+import { type Figure, buildFigure } from './figure';
 import { cloneWeaponModel } from './weapon-model';
 
 interface Sample {
@@ -37,19 +37,10 @@ interface Sample {
 }
 
 const BUFFER_LIMIT = 24;
-const SUIT = new THREE.MeshStandardMaterial({ color: 0x2a3038, roughness: 0.72, metalness: 0.15 });
-const DARK = new THREE.MeshStandardMaterial({ color: 0x14171c, roughness: 0.85, metalness: 0.1 });
-const HAIR = new THREE.MeshStandardMaterial({ color: 0x241c18, roughness: 0.88, metalness: 0.05 });
 
 export class RemotePlayer {
   readonly root = new THREE.Group();
-  private readonly hips = new THREE.Group();
-  private readonly upper = new THREE.Group();
-  private readonly head = new THREE.Group();
-  private readonly hair = new THREE.Group();
-  private readonly legL: THREE.Mesh;
-  private readonly legR: THREE.Mesh;
-  private readonly teamMaterial: THREE.MeshStandardMaterial;
+  private readonly figure: Figure;
   private weaponRoot: THREE.Group | null = null;
   private weaponId = -1;
 
@@ -71,150 +62,33 @@ export class RemotePlayer {
   ) {
     this.team = team;
     this.character = getCharacter(characterId);
-    const c = this.character;
-
-    this.teamMaterial = new THREE.MeshStandardMaterial({
-      color: TEAM_COLORS[team],
-      roughness: 0.55,
-      metalness: 0.2,
-      emissive: new THREE.Color(TEAM_COLORS[team]).multiplyScalar(0.16),
-    });
-
-    // Legs hang from the hip origin so scaling them crouches the figure.
-    const legGeometry = new THREE.BoxGeometry(c.legWidth, 0.86, c.legWidth * 1.18);
-    legGeometry.translate(0, -0.43, 0);
-    this.legL = new THREE.Mesh(legGeometry, DARK);
-    this.legR = new THREE.Mesh(legGeometry, DARK);
-    this.legL.position.set(-c.legSpacing, 0, 0);
-    this.legR.position.set(c.legSpacing, 0, 0);
-    this.legL.castShadow = true;
-    this.legR.castShadow = true;
-    this.hips.add(this.legL, this.legR);
-
-    // Hips, waist and chest as three stacked slabs. On an athletic build the
-    // waist is narrower than both, which is the whole silhouette.
-    const pelvis = new THREE.Mesh(new THREE.BoxGeometry(c.hipWidth, 0.2, c.chestDepth), SUIT);
-    pelvis.position.y = 0.1;
-    pelvis.castShadow = true;
-    this.upper.add(pelvis);
-
-    const waist = new THREE.Mesh(
-      new THREE.BoxGeometry(c.waistWidth, 0.2, c.chestDepth * 0.9),
-      SUIT,
-    );
-    waist.position.y = 0.29;
-    waist.castShadow = true;
-    this.upper.add(waist);
-
-    const chest = new THREE.Mesh(new THREE.BoxGeometry(c.chestWidth, 0.26, c.chestDepth), SUIT);
-    chest.position.y = 0.5;
-    chest.castShadow = true;
-    this.upper.add(chest);
-
-    // Team-coloured shoulder plates: the strongest read at distance.
-    const shoulders = new THREE.Mesh(
-      new THREE.BoxGeometry(c.shoulderWidth, 0.11, c.chestDepth * 1.08),
-      this.teamMaterial,
-    );
-    shoulders.position.y = 0.66;
-    shoulders.castShadow = true;
-    this.upper.add(shoulders);
-
-    const headMesh = new THREE.Mesh(
-      new THREE.BoxGeometry(c.headWidth, c.headWidth, c.headWidth),
-      SUIT,
-    );
-    headMesh.castShadow = true;
-    this.head.add(headMesh);
-
-    const visor = new THREE.Mesh(
-      new THREE.BoxGeometry(c.headWidth * 0.8, 0.075, 0.02),
-      this.teamMaterial,
-    );
-    visor.position.set(0, 0.02, -c.headWidth / 2 - 0.005);
-    this.head.add(visor);
-
-    this.buildHair(c);
-    this.head.add(this.hair);
-    this.head.position.y = 0.86;
-    this.upper.add(this.head);
-
-    const armGeometry = new THREE.BoxGeometry(c.armWidth, 0.42, c.armWidth * 1.1);
-    armGeometry.translate(0, -0.21, 0);
-    const armL = new THREE.Mesh(armGeometry, SUIT);
-    const armR = new THREE.Mesh(armGeometry, SUIT);
-    armL.position.set(-(c.shoulderWidth / 2 + c.armWidth * 0.1), 0.63, 0);
-    armR.position.set(c.shoulderWidth / 2 + c.armWidth * 0.1, 0.63, 0);
-    armL.rotation.x = -0.9;
-    armR.rotation.x = -1.1;
-    armL.castShadow = true;
-    armR.castShadow = true;
-    this.upper.add(armL, armR);
-
-    this.upper.position.y = 0.86;
-    this.root.add(this.hips, this.upper);
-    this.root.position.y = PLAYER_HEIGHT * 0.5;
+    this.figure = buildFigure(this.character, TEAM_COLORS[team]);
+    this.root.add(this.figure.root);
     scene.add(this.root);
-  }
-
-  private buildHair(c: CharacterDef): void {
-    if (c.hair === 'none') return;
-    const half = c.headWidth / 2;
-
-    if (c.hair === 'ponytail') {
-      // A crown cap plus a tail that trails behind and swings when running.
-      const cap = new THREE.Mesh(
-        new THREE.BoxGeometry(c.headWidth * 1.04, c.headWidth * 0.42, c.headWidth * 1.04),
-        HAIR,
-      );
-      cap.position.set(0, half * 0.62, 0.004);
-      cap.castShadow = true;
-      this.hair.add(cap);
-
-      const tail = new THREE.Mesh(new THREE.BoxGeometry(0.062, 0.3, 0.062), HAIR);
-      tail.geometry.translate(0, -0.15, 0);
-      tail.position.set(0, half * 0.5, half * 0.92);
-      tail.rotation.x = -0.42;
-      tail.castShadow = true;
-      tail.name = 'tail';
-      this.hair.add(tail);
-      return;
-    }
-
-    // Bun: a low cap and a rounded knot at the back of the head.
-    const cap = new THREE.Mesh(
-      new THREE.BoxGeometry(c.headWidth * 1.04, c.headWidth * 0.4, c.headWidth * 1.04),
-      HAIR,
-    );
-    cap.position.set(0, half * 0.64, 0.004);
-    cap.castShadow = true;
-    this.hair.add(cap);
-
-    const knot = new THREE.Mesh(new THREE.SphereGeometry(0.052, 10, 8), HAIR);
-    knot.position.set(0, half * 0.5, half * 0.98);
-    knot.castShadow = true;
-    this.hair.add(knot);
   }
 
   setTeam(team: TeamId): void {
     if (this.team === team) return;
     this.team = team;
-    this.teamMaterial.color.setHex(TEAM_COLORS[team]);
-    this.teamMaterial.emissive.setHex(TEAM_COLORS[team]).multiplyScalar(0.16);
+    for (const material of this.figure.teamMaterials) {
+      material.color.setHex(TEAM_COLORS[team]);
+      material.emissive.setHex(TEAM_COLORS[team]).multiplyScalar(0.15);
+    }
   }
 
   private setWeapon(weaponId: number): void {
     if (this.weaponId === weaponId) return;
     this.weaponId = weaponId;
     if (this.weaponRoot) {
-      this.upper.remove(this.weaponRoot);
+      this.figure.grip.remove(this.weaponRoot);
       this.weaponRoot = null;
     }
     const model = cloneWeaponModel(getWeapon(weaponId));
-    model.root.position.set(0.16, 0.46, -0.24);
-    model.root.rotation.set(0, 0, 0);
+    // Sat in the hand, then rotated so the barrel points where the figure faces.
+    model.root.position.set(0, -0.02, -0.12);
+    model.root.rotation.set(1.62, 0, 0);
     this.weaponRoot = model.root;
-    this.upper.add(model.root);
+    this.figure.grip.add(model.root);
   }
 
   push(entity: EntitySnapshot, time: number): void {
@@ -283,31 +157,48 @@ export class RemotePlayer {
     this.root.position.set(x, y, z);
     this.root.rotation.y = yaw;
 
-    // Squash the model toward the reported hull height when crouching.
-    const scale = height / PLAYER_HEIGHT;
-    this.hips.scale.y = scale;
-    this.hips.position.y = 0.86 * scale;
-    // The torso leans out while the feet stay put - so a peeking opponent
-    // shows exactly the sliver of body that their own camera has bought them.
-    this.upper.position.x = lean * LEAN_DISTANCE;
-    this.upper.position.y = 0.86 * scale - Math.abs(lean) * LEAN_DROP;
-    this.upper.rotation.z = -lean * LEAN_ROLL * 1.8;
-    this.head.rotation.x = -pitch * 0.55;
-    if (this.weaponRoot) this.weaponRoot.rotation.x = -pitch;
+    const figure = this.figure;
 
-    // Walk cycle driven by measured ground speed.
+    // Crouching squashes the whole figure toward the reported hull height,
+    // which keeps the model inside the hitbox the server is using.
+    const scale = height / PLAYER_HEIGHT;
+    figure.root.scale.y = scale;
+
+    // Lean slides the torso out past the feet and rolls it, so a peeking
+    // opponent shows exactly the sliver of body their own camera bought them.
+    figure.torso.position.x = lean * LEAN_DISTANCE;
+    figure.torso.position.z = 0;
+    figure.torso.rotation.z = -lean * LEAN_ROLL * 1.7;
+
+    // The upper body carries the aim; the head adds a little more.
+    figure.torso.rotation.x = -pitch * 0.35;
+    figure.head.rotation.x = -pitch * 0.5;
+
     const speed = Math.hypot(x - this.lastX, z - this.lastZ) / Math.max(dt, 1e-3);
     this.lastX = x;
     this.lastZ = z;
-    this.stride += speed * dt * 3.6;
-    const swing = Math.sin(this.stride) * Math.min(0.7, speed * 0.11);
-    this.legL.rotation.x = swing;
-    this.legR.rotation.x = -swing;
 
-    // The ponytail lags behind the run cycle rather than tracking it exactly.
-    const tail = this.hair.getObjectByName('tail');
+    // Walk cycle. Thighs swing out of phase and the knee only bends on the
+    // backswing, which is what stops it looking like scissors.
+    this.stride += speed * dt * 3.4;
+    const gait = Math.min(1, speed / 6.5);
+    const swing = Math.sin(this.stride) * 0.72 * gait;
+    figure.thighL.rotation.x = swing;
+    figure.thighR.rotation.x = -swing;
+    figure.shinL.rotation.x = -Math.max(0, -swing) * 1.25 - 0.05;
+    figure.shinR.rotation.x = -Math.max(0, swing) * 1.25 - 0.05;
+
+    // Arms counter-rotate a little, but stay on the weapon.
+    figure.upperArmL.rotation.z = 0.34 - swing * 0.1;
+    figure.upperArmR.rotation.z = -0.16 + swing * 0.1;
+
+    // A running figure bobs and rolls slightly.
+    figure.root.position.y = -Math.abs(Math.sin(this.stride)) * 0.035 * gait;
+    figure.torso.rotation.y = Math.sin(this.stride) * 0.07 * gait;
+
+    const tail = figure.hair.getObjectByName('tail');
     if (tail) {
-      const target = -0.42 - Math.sin(this.stride * 0.5) * Math.min(0.34, speed * 0.06);
+      const target = -0.38 - Math.sin(this.stride * 0.5) * 0.3 * gait;
       this.hairSway += (target - this.hairSway) * Math.min(1, dt * 9);
       tail.rotation.x = this.hairSway;
     }
@@ -315,10 +206,7 @@ export class RemotePlayer {
 
   dispose(): void {
     this.scene.remove(this.root);
-    this.root.traverse((object) => {
-      if (object instanceof THREE.Mesh) object.geometry.dispose();
-    });
-    this.teamMaterial.dispose();
+    this.figure.dispose();
   }
 }
 
