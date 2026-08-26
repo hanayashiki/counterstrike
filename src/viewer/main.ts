@@ -94,6 +94,19 @@ const modelPivot = new THREE.Group();
 modelPivot.position.x = ((CHARACTERS.length - 1) / 2 + 1) * SPACING;
 scene.add(modelPivot);
 
+const modelRing = new THREE.Mesh(
+  new THREE.RingGeometry(0.42, 0.5, 32),
+  new THREE.MeshBasicMaterial({
+    color: 0x4aa8ff,
+    transparent: true,
+    opacity: 0.55,
+    side: THREE.DoubleSide,
+  }),
+);
+modelRing.rotation.x = -Math.PI / 2;
+modelRing.position.y = 0.004;
+modelPivot.add(modelRing);
+
 const modelLabel = document.createElement('div');
 modelLabel.className = 'label';
 modelLabel.innerHTML = '<b>CesiumMan</b><span>downloaded · rigged</span>';
@@ -152,7 +165,7 @@ labels.append(modelLabel);
 
 let yaw = 0.35;
 let pitch = 0.12;
-let distance = 4.6;
+let distance = 6.0;
 let dragging = false;
 let lastX = 0;
 let lastY = 0;
@@ -185,7 +198,9 @@ canvas.addEventListener(
 
 // ------------------------------------------------------------------ loop ---
 
-const target = new THREE.Vector3(0, 0.95, 0);
+// Centred on all four figures, not just the procedural three, or the
+// downloaded model sits exactly on the right edge of frame.
+const target = new THREE.Vector3(((CHARACTERS.length - 1) / 2 + 1) * SPACING * 0.5, 0.95, 0);
 const projected = new THREE.Vector3();
 let stride = 0;
 let last = performance.now();
