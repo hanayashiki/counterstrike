@@ -65,8 +65,13 @@ scene.add(grid);
 // --------------------------------------------------------------- figures ---
 
 const SPACING = 1.35;
-const MODEL_URL =
-  (globalThis as { __MODEL_URL__?: string }).__MODEL_URL__ ?? '/models/CesiumMan.glb';
+/**
+ * The single-file build embeds the model as base64 and parses it in page; the
+ * dev server serves it over http exactly as the game does. Fetching a `data:`
+ * URI would be simpler, but a sandboxed page refuses it.
+ */
+const EMBEDDED = (globalThis as { __MODEL_B64__?: string }).__MODEL_B64__;
+const MODEL_URL = '/models/CesiumMan.glb';
 const figures = CHARACTERS.map((character, index) => {
   const pivot = new THREE.Group();
   pivot.position.x = (index - (CHARACTERS.length - 1) / 2) * SPACING;
