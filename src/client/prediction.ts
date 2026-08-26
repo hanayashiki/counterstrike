@@ -81,7 +81,7 @@ export class LocalPlayer {
   };
 
   constructor(
-    private readonly brushes: readonly Brush[],
+    private brushes: readonly Brush[],
     private readonly events: PredictionEvents,
     private readonly rng: () => number = Math.random,
   ) {}
@@ -308,6 +308,11 @@ export class LocalPlayer {
   /** Commands the server has not acknowledged yet, newest last. */
   unacked(limit: number): InputCommand[] {
     return this.pending.length <= limit ? this.pending : this.pending.slice(-limit);
+  }
+
+  /** Swap the collision set when the room changes map. */
+  setBrushes(brushes: readonly Brush[]): void {
+    this.brushes = brushes;
   }
 
   reset(): void {

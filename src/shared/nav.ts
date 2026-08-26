@@ -147,16 +147,45 @@ export class NavGraph {
       }
     }
 
-    graph.pruneIsolated();
+    graph.keepReachableFromSpawns();
     return graph;
   }
 
   /**
-   * Drop waypoints nothing links to. A bot that snapped to an isolated node
-   * would never find a path and would stand there forever.
+   * Keep only the waypoints a player can actually get to from a spawn.
+   *
+   * The grid also lands on surfaces nobody can reach - the tops of the
+   * perimeter walls, for instance. Those are not merely isolated: a wall top
+   * links *downward* into the map, because a drop is traversable even when the
+   * matching climb is not. So "largest connected component" is the wrong test,
+   * since reachability here is directional; flooding forward from the spawns is
+   * the question actually being asked. One-way ledges you can drop off but not
+   * climb back onto are legitimate, and survive.
    */
-  private pruneIsolated(): void {
-    const keep = this.nodes.filter((node) => node.links.length > 0);
+  private keepReachableFromSpawns(): void {
+    if (this.nodes.length === 0) return;
+
+    const reached = new Uint8Array(this.nodes.length);
+    const stack: number[] = [];
+    for (const spawn of this.map.spawns) {
+      const start = this.nearest(spawn.pos);
+      if (start >= 0 && !reached[start]) {
+        reached[start] = 1;
+        stack.push(start);
+      }
+    }
+    if (stack.length === 0) return;
+
+    while (stack.length > 0) {
+      const current = stack.pop() as number;
+      for (const link of (this.nodes[current] as NavNode).links) {
+        if (reached[link.to]) continue;
+        reached[link.to] = 1;
+        stack.push(link.to);
+      }
+    }
+
+    const keep = this.nodes.filter((node) => reached[node.id]);
     if (keep.length === this.nodes.length) return;
 
     const remap = new Map<number, number>();

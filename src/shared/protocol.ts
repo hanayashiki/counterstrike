@@ -6,7 +6,7 @@
 import { type BinaryReader, BinaryWriter, type Bytes } from './binary';
 import type { TeamId } from './map';
 
-export const PROTOCOL_VERSION = 6;
+export const PROTOCOL_VERSION = 7;
 
 export const enum MsgType {
   // client -> server
@@ -18,6 +18,7 @@ export const enum MsgType {
   Ping = 6,
   SetTeam = 7,
   SetBotSkill = 8,
+  SetMap = 9,
 
   // server -> client
   Welcome = 64,
@@ -169,6 +170,8 @@ export interface MatchStateMsg {
   mvp: number;
   /** Index into BOT_SKILLS, so everyone sees the current difficulty. */
   botSkill: number;
+  /** Index into MAPS. A change here means the room restarted on a new map. */
+  mapId: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -521,7 +524,8 @@ export function encodeMatchState(m: MatchStateMsg): Bytes {
     .u16(m.scoreBlue)
     .u16(m.round)
     .u16(m.mvp)
-    .u8(m.botSkill);
+    .u8(m.botSkill)
+    .u8(m.mapId);
   return w.finish();
 }
 
@@ -534,6 +538,7 @@ export function decodeMatchState(r: BinaryReader): MatchStateMsg {
     round: r.u16(),
     mvp: r.u16(),
     botSkill: r.u8(),
+    mapId: r.u8(),
   };
 }
 

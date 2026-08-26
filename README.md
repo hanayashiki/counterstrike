@@ -70,7 +70,9 @@ src/shared/    engine shared by both sides — must stay byte-identical
   math.ts        Vec3, angles, seeded PRNG
   binary.ts      BinaryWriter / BinaryReader
   protocol.ts    wire format
-  map.ts         the map, authored as boxes
+  map.ts         map registry
+  map-types.ts   map authoring primitives
+  maps/          the maps themselves, authored as boxes
   collision.ts   AABB raycasts, hull sweeps, moveAndSlide
   movement.ts    the movement step (server authority AND client prediction)
   weapons.ts     weapon table
@@ -184,6 +186,30 @@ ladder stays monotonic, so a tuning change that accidentally makes `easy`
 deadlier than `elite` fails the suite. That is not hypothetical — it is exactly
 what happened when `aimJitter` was applied as a per-tick random walk that the
 tracking term cancelled on the same tick.
+
+## Maps
+
+Two maps, switchable from the in-game options panel (`O`). Changing map restarts
+the match for everyone: the world and its navigation graph are rebuilt, but
+players are re-seated rather than kicked — a fresh `Welcome` tells each client to
+tear down its scene and load the new one, keeping the loadout it already had.
+
+| | shape | character |
+| --- | --- | --- |
+| **Grid** (`cs_grid`) | 70 × 70 m, square | three lanes, a raised central platform with walkable staircases |
+| **Transport Ship** (`cs_cargo`) | 44 × 100 m, long | bow/stern spawns, three lanes down the deck, narrow flank catwalks, climbable container stacks |
+
+Transport Ship is a blockout in the spirit of CrossFire's 运输船 — an original
+box-geometry interpretation of the documented layout, not extracted assets. It
+departs from the original in one way: that map has below-deck passages, and this
+engine's navigation drops a grid onto the highest surface, so a tunnel beneath
+the deck would never receive waypoints. The side catwalks carry the same role.
+
+Adding a map means adding one file under `src/shared/maps/` and listing it in
+the registry; the picker builds itself from that list, and
+`tests/maps.test.ts` runs the whole contract against every map automatically —
+spawns you can stand in, both sides mutually reachable, and no waypoint on
+scenery a player could never climb to.
 
 ## Gameplay
 

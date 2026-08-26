@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
-import { GAME_MAP, type MapSolid, type SurfaceKind } from '../../shared/map';
+import { GAME_MAP, type GameMap, type MapSolid, type SurfaceKind } from '../../shared/map';
 import { createSurfaceTexture } from './textures';
 
 interface SurfaceStyle {
@@ -102,12 +102,12 @@ export interface WorldMesh {
   dispose(): void;
 }
 
-export function buildWorld(scene: THREE.Scene): WorldMesh {
+export function buildWorld(scene: THREE.Scene, map: GameMap = GAME_MAP): WorldMesh {
   const group = new THREE.Group();
   group.name = 'world';
 
   const byKind = new Map<SurfaceKind, MapSolid[]>();
-  for (const solid of GAME_MAP.solids) {
+  for (const solid of map.solids) {
     const list = byKind.get(solid.kind);
     if (list) list.push(solid);
     else byKind.set(solid.kind, [solid]);
@@ -154,7 +154,7 @@ export function buildWorld(scene: THREE.Scene): WorldMesh {
   // A faint horizon glow so the skybox is not a flat void.
   const skyGeometry = new THREE.SphereGeometry(180, 24, 16);
   const skyMaterial = new THREE.MeshBasicMaterial({
-    color: GAME_MAP.skyColor,
+    color: map.skyColor,
     side: THREE.BackSide,
     fog: false,
   });

@@ -184,6 +184,12 @@ export class Hud {
     this.skillNote.textContent = skillNote;
   }
 
+  setPausedMap(mapIndex: number): void {
+    for (const button of this.pause.querySelectorAll<HTMLButtonElement>('#map-choices button')) {
+      button.classList.toggle('active', Number(button.dataset.value) === mapIndex);
+    }
+  }
+
   setPausedTeam(team: TeamId): void {
     for (const button of this.pause.querySelectorAll<HTMLButtonElement>('#team-choices button')) {
       button.classList.toggle('active', Number(button.dataset.value) === team);

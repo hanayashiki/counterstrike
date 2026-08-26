@@ -125,6 +125,7 @@ test('welcome, player info, match state and ping/pong all roundtrip', () => {
         round: 3,
         mvp: 9,
         botSkill: 2,
+        mapId: 1,
       }),
       MsgType.MatchState,
     ),
@@ -132,6 +133,7 @@ test('welcome, player info, match state and ping/pong all roundtrip', () => {
   assert.equal(match.phase, MatchPhase.RoundEnd);
   assert.equal(match.timeLeftMs, 5500);
   assert.equal(match.botSkill, 2, 'the live difficulty must reach the client');
+  assert.equal(match.mapId, 1, 'the live map must reach the client');
 
   const ping = decodePing(readerFor(encodePing(999, 73), MsgType.Ping));
   assert.deepEqual(ping, { clientTimeMs: 999, measuredRttMs: 73 });

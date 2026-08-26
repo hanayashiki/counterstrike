@@ -137,6 +137,10 @@ export class NetClient {
     this.send(encodeSimple(MsgType.SetBotSkill, index));
   }
 
+  setMap(index: number): void {
+    this.send(encodeSimple(MsgType.SetMap, index));
+  }
+
   sendChat(text: string): void {
     this.send(encodeChat(text));
   }

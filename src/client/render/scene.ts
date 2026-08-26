@@ -7,7 +7,7 @@
  */
 import * as THREE from 'three';
 
-import { GAME_MAP } from '../../shared/map';
+import { GAME_MAP, type GameMap } from '../../shared/map';
 
 export const DEFAULT_FOV = 82;
 
@@ -37,7 +37,7 @@ export class RenderContext {
     this.renderer.autoClear = false;
 
     this.scene.background = new THREE.Color(GAME_MAP.skyColor);
-    this.scene.fog = new THREE.Fog(GAME_MAP.fogColor, 34, 96);
+    this.scene.fog = new THREE.Fog(GAME_MAP.fogColor, GAME_MAP.fogNear, GAME_MAP.fogFar);
 
     this.camera = new THREE.PerspectiveCamera(DEFAULT_FOV, 1, 0.06, 400);
     this.camera.rotation.order = 'YXZ';
@@ -74,6 +74,15 @@ export class RenderContext {
 
     this.resize();
     globalThis.addEventListener('resize', () => this.resize());
+  }
+
+  /** Re-tint the sky and fog for a newly loaded map. */
+  applyMap(map: GameMap): void {
+    (this.scene.background as THREE.Color).setHex(map.skyColor);
+    const fog = this.scene.fog as THREE.Fog;
+    fog.color.setHex(map.fogColor);
+    fog.near = map.fogNear;
+    fog.far = map.fogFar;
   }
 
   resize(): void {

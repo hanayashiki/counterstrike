@@ -42,7 +42,16 @@ import {
   WARMUP_MS,
   botSkillIndex,
 } from '../shared/config';
-import { GAME_MAP, TEAM_BLUE, TEAM_RED, type SpawnPoint, type TeamId } from '../shared/map';
+import {
+  DEFAULT_MAP_ID,
+  type GameMap,
+  type SpawnPoint,
+  TEAM_BLUE,
+  TEAM_RED,
+  type TeamId,
+  getMap,
+  mapIndex,
+} from '../shared/map';
 import { Rng, type Vec3, distance, forwardFromAngles, vec3 } from '../shared/math';
 import { horizontalSpeed, stepMovement } from '../shared/movement';
 import { NavGraph } from '../shared/nav';
@@ -89,6 +98,8 @@ export interface WorldOptions {
   targetPlayers: number;
   botSkill: BotSkill;
   seed: number;
+  /** Which map to load. Changing it means building a new world. */
+  mapId?: string;
 }
 
 export interface BotBrain {
@@ -121,7 +132,7 @@ const scratchMove: MoveResult = {
 };
 
 export class GameWorld {
-  readonly map = GAME_MAP;
+  readonly map: GameMap;
   readonly nav: NavGraph;
   readonly combatants = new Map<number, Combatant>();
 
@@ -164,6 +175,7 @@ export class GameWorld {
   private readonly botSeeds = new Map<number, number>();
 
   constructor(readonly options: WorldOptions) {
+    this.map = getMap(options.mapId ?? DEFAULT_MAP_ID);
     this.rng = new Rng(options.seed);
     this.cosmeticRng = new Rng((options.seed ^ 0x5eed_c05e) >>> 0);
     this.nav = NavGraph.build(this.map);
@@ -942,6 +954,7 @@ export class GameWorld {
       round: this.round,
       mvp: this.mvp,
       botSkill: botSkillIndex(this.options.botSkill),
+      mapId: mapIndex(this.map.id),
     };
   }
 }

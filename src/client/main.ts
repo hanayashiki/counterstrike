@@ -22,7 +22,7 @@ import {
   RESPAWN_DELAY_MS,
   TICK_RATE,
 } from '../shared/config';
-import { GAME_MAP, TEAM_NAMES, type TeamId } from '../shared/map';
+import { GAME_MAP, MAPS, TEAM_NAMES, type TeamId, getMap } from '../shared/map';
 import { type Vec3, forwardFromAngles, vec3 } from '../shared/math';
 import {
   EventKind,
@@ -45,7 +45,7 @@ import { EffectsSystem } from './render/effects';
 import { PlayerManager } from './render/players';
 import { DEFAULT_FOV, RenderContext } from './render/scene';
 import { Viewmodel } from './render/viewmodel';
-import { buildWorld } from './render/world';
+import { type WorldMesh, buildWorld } from './render/world';
 
 const TICK_MS = 1000 / TICK_RATE;
 const MAX_STEPS_PER_FRAME = 5;
@@ -112,6 +112,9 @@ class Game {
   private myId = 0;
   private myTeam: TeamId = 0;
 
+  private worldMesh: WorldMesh;
+  private currentMapId = '';
+
   private match: MatchStateMsg = {
     phase: MatchPhase.Warmup,
     timeLeftMs: 0,
@@ -120,6 +123,7 @@ class Game {
     round: 1,
     mvp: 0xffff,
     botSkill: 1,
+    mapId: 0,
   };
   private matchStateAt = 0;
 
@@ -146,7 +150,8 @@ class Game {
   private readonly cameraForward = new THREE.Vector3();
 
   constructor() {
-    buildWorld(this.ctx.scene);
+    this.worldMesh = buildWorld(this.ctx.scene, GAME_MAP);
+    this.currentMapId = GAME_MAP.id;
 
     this.hud = new Hud((text) => this.net.sendChat(text));
 
@@ -230,6 +235,25 @@ class Game {
       });
     }
 
+    // Built from the registry rather than authored in the markup, so adding a
+    // map cannot leave the picker stale.
+    const maps = document.getElementById('map-choices') as HTMLElement;
+    for (const [index, map] of MAPS.entries()) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.dataset.value = String(index);
+      button.textContent = map.label;
+      maps.append(button);
+    }
+    for (const button of maps.querySelectorAll('button')) {
+      button.addEventListener('click', () => {
+        const index = Number(button.dataset.value);
+        if (index === this.match.mapId) return;
+        this.net.setMap(index);
+        this.hud.addSystem('Changing map…');
+      });
+    }
+
     const resume = document.getElementById('resume') as HTMLButtonElement;
     resume.addEventListener('click', () => {
       this.setPaused(false);
@@ -248,7 +272,10 @@ class Game {
 
   private setPaused(paused: boolean): void {
     this.hud.setPaused(paused, this.match.botSkill, SKILL_NOTES[this.match.botSkill] ?? '');
-    if (paused) this.hud.setPausedTeam(this.myTeam);
+    if (paused) {
+      this.hud.setPausedTeam(this.myTeam);
+      this.hud.setPausedMap(this.match.mapId);
+    }
   }
 
   async start(
@@ -288,7 +315,27 @@ class Game {
   private onWelcome(msg: WelcomeMsg): void {
     this.myId = msg.yourId;
     this.local.reset();
-    this.hud.addSystem(`Connected to ${msg.mapName} (${msg.tickRate} Hz)`);
+    // A Welcome also arrives when the room restarts on a different map, so this
+    // is where the scene is torn down and rebuilt.
+    this.loadMap(msg.mapName);
+    this.hud.addSystem(`${getMap(msg.mapName).label} · ${msg.tickRate} Hz`);
+  }
+
+  /** Swap the rendered world and the collision set the client predicts against. */
+  private loadMap(mapId: string): void {
+    if (mapId === this.currentMapId) return;
+    const map = getMap(mapId);
+    this.currentMapId = map.id;
+
+    this.worldMesh.dispose();
+    this.worldMesh = buildWorld(this.ctx.scene, map);
+    this.ctx.applyMap(map);
+    this.local.setBrushes(map.brushes);
+    this.local.reset();
+    // Nothing from the old map should linger: avatars, decals or tracers.
+    this.players.clear();
+    this.aliveIds.clear();
+    this.hud.banner(`Now playing ${map.label}`, 3200);
   }
 
   private onPlayerInfo(info: PlayerInfo): void {
@@ -312,6 +359,7 @@ class Game {
     this.hud.setScores(state.scoreRed, state.scoreBlue);
     if (this.hud.paused) {
       this.hud.setPaused(true, state.botSkill, SKILL_NOTES[state.botSkill] ?? '');
+      this.hud.setPausedMap(state.mapId);
     }
     this.hud.setMatchState(state.phase, state.timeLeftMs, state.round);
     if (state.phase === MatchPhase.RoundEnd && previousPhase !== MatchPhase.RoundEnd) {

@@ -21,6 +21,7 @@ import {
   TICK_RATE,
   botSkillFromIndex,
 } from '../shared/config';
+import { DEFAULT_MAP_ID, getMap, mapFromIndex } from '../shared/map';
 import {
   MsgType,
   PROTOCOL_VERSION,
@@ -83,6 +84,7 @@ function hashString(value: string): number {
 
 export class GameRoom implements DurableObject {
   private world: GameWorld | null = null;
+  private mapId: string = DEFAULT_MAP_ID;
   private readonly sessions = new Map<WebSocket, Session>();
   private loop: ReturnType<typeof setInterval> | null = null;
 
@@ -180,6 +182,7 @@ export class GameRoom implements DurableObject {
     const world = new GameWorld({
       targetPlayers,
       botSkill,
+      mapId: this.mapId,
       seed: hashString(this.ctx.id.toString()) ^ 0x5f3759df,
     });
     world.setBotFactory(createBot);
@@ -357,20 +360,10 @@ export class GameRoom implements DurableObject {
         session.joined = true;
         world.balanceBots();
 
-        this.send(
-          session,
-          encodeWelcome({
-            yourId: combatant.id,
-            tickRate: TICK_RATE,
-            snapshotRate: SNAPSHOT_RATE,
-            mapName: world.map.name,
-            serverTimeMs: Math.round(world.timeMs),
-          }),
-        );
+        this.welcome(session, world);
         for (const other of world.combatants.values()) {
           this.send(session, encodePlayerInfo(world.playerInfo(other)));
         }
-        this.send(session, encodeMatchState(world.matchState()));
         this.broadcast(encodePlayerInfo(world.playerInfo(combatant)));
         this.startLoop();
         return;
@@ -425,6 +418,13 @@ export class GameRoom implements DurableObject {
         return;
       }
 
+      case MsgType.SetMap: {
+        if (!session.joined) return;
+        const map = mapFromIndex(reader.u8());
+        if (map.id !== world.map.id) this.changeMap(map.id, session.playerId);
+        return;
+      }
+
       case MsgType.Ping: {
         const ping = decodePing(reader);
         const combatant = world.combatants.get(session.playerId);
@@ -445,6 +445,74 @@ export class GameRoom implements DurableObject {
       default:
         return;
     }
+  }
+
+  /**
+   * Switching maps restarts the match: the world, its navigation graph and
+   * every score are rebuilt. Rather than dropping everyone, each session is
+   * re-seated - a fresh Welcome tells the client to tear down its scene and
+   * build the new map, and it rejoins with the loadout it already had.
+   */
+  private changeMap(mapId: string, requestedBy: number): void {
+    const previous = this.world;
+    const requester = previous?.combatants.get(requestedBy);
+    const announcement = `${requester?.name ?? 'someone'} switched to ${getMap(mapId).label}`;
+
+    // Remember who was playing as what before the world is thrown away.
+    const seats = new Map<
+      WebSocket,
+      { name: string; team: number; weapon: number; character: number }
+    >();
+    for (const session of this.sessions.values()) {
+      if (!session.joined) continue;
+      const c = previous?.combatants.get(session.playerId);
+      if (!c) continue;
+      seats.set(session.ws, {
+        name: c.name,
+        team: c.team,
+        weapon: c.slots[0]?.weapon ?? WeaponId.Rifle,
+        character: c.character,
+      });
+    }
+
+    this.mapId = mapId;
+    this.world = null;
+    const world = this.ensureWorld();
+
+    for (const session of this.sessions.values()) {
+      const seat = seats.get(session.ws);
+      if (!seat) continue;
+      const combatant = world.addPlayer(seat.name, false, seat.team, seat.weapon, seat.character);
+      session.playerId = combatant.id;
+      session.lastSnapshotTick = -1;
+      this.welcome(session, world);
+    }
+    world.balanceBots();
+
+    for (const session of this.sessions.values()) {
+      if (!session.joined) continue;
+      for (const other of world.combatants.values()) {
+        this.send(session, encodePlayerInfo(world.playerInfo(other)));
+      }
+    }
+    world.dirtyRoster.clear();
+    world.departed.length = 0;
+    this.broadcast(encodeChatBroadcast(0, announcement));
+    this.startLoop();
+  }
+
+  private welcome(session: Session, world: GameWorld): void {
+    this.send(
+      session,
+      encodeWelcome({
+        yourId: session.playerId,
+        tickRate: TICK_RATE,
+        snapshotRate: SNAPSHOT_RATE,
+        mapName: world.map.id,
+        serverTimeMs: Math.round(world.timeMs),
+      }),
+    );
+    this.send(session, encodeMatchState(world.matchState()));
   }
 
   private dropSession(session: Session): void {
