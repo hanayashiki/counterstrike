@@ -42,9 +42,21 @@ const FATIGUES = new THREE.MeshStandardMaterial({
   metalness: 0.04,
 });
 const WEBBING = new THREE.MeshStandardMaterial({
-  color: 0x22272e,
-  roughness: 0.8,
-  metalness: 0.12,
+  color: 0x394452,
+  roughness: 0.78,
+  metalness: 0.14,
+});
+/** Hard armour: darker and glossier than webbing. */
+const PLATE = new THREE.MeshStandardMaterial({
+  color: 0x262c36,
+  roughness: 0.55,
+  metalness: 0.3,
+});
+/** Softer, warmer shell, so a jacket does not read as more armour. */
+const JACKET = new THREE.MeshStandardMaterial({
+  color: 0x4a4436,
+  roughness: 0.88,
+  metalness: 0.05,
 });
 const BOOT = new THREE.MeshStandardMaterial({ color: 0x15181d, roughness: 0.9, metalness: 0.06 });
 const HAIR_MAT = new THREE.MeshStandardMaterial({
@@ -110,6 +122,29 @@ function trunk(
   parent.add(mesh);
   return mesh;
 }
+
+const LIMB_AXIS = new THREE.Vector3(0, -1, 0);
+const aimScratch = new THREE.Vector3();
+const aimParent = new THREE.Quaternion();
+
+/**
+ * Point a limb group along a world direction.
+ *
+ * Every limb here hangs along -Y from its own origin, so the axis is known and
+ * aiming is exact. Guessing Euler angles for a two-bone chain is not — three
+ * attempts at it put the hands inside the chest.
+ */
+function aimLimb(group: THREE.Object3D, worldDir: THREE.Vector3): void {
+  group.parent?.getWorldQuaternion(aimParent).invert();
+  aimScratch.copy(worldDir).normalize();
+  if (group.parent) aimScratch.applyQuaternion(aimParent);
+  group.quaternion.setFromUnitVectors(LIMB_AXIS, aimScratch);
+  group.updateMatrixWorld(true);
+}
+
+/** Weapon carry, as the world direction each segment points. */
+const CARRY_UPPER = new THREE.Vector3(0.05, -0.95, -0.3);
+const CARRY_FORE = new THREE.Vector3(-0.25, -0.52, -0.78);
 
 export function buildFigure(c: CharacterDef, teamColor: number): Figure {
   const owned: THREE.BufferGeometry[] = [];
@@ -242,46 +277,53 @@ export function buildFigure(c: CharacterDef, teamColor: number): Figure {
 
   // Worn kit. This changes the outline as much as the body does, and is what
   // separates two operators who share a build.
+  //
+  // Everything here is a fitted shell rather than a slab: a box across the
+  // chest reads as a black rectangle at any distance and hides the body
+  // underneath, which is what the torso shaping is for.
+  const shell = (
+    topWidth: number,
+    bottomWidth: number,
+    height: number,
+    yBase: number,
+    material: THREE.Material,
+    depthBias = 0.014,
+  ): void => {
+    const geometry = new THREE.CylinderGeometry(topWidth / 2, bottomWidth / 2, height, 16, 1);
+    geometry.scale(1, 1, (c.chestDepth + depthBias * 2) / c.chestWidth);
+    geometry.translate(0, yBase + height / 2, 0);
+    owned.push(geometry);
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.castShadow = true;
+    torso.add(mesh);
+  };
+
   if (c.gear === 'plate') {
-    const plate = new THREE.BoxGeometry(
-      c.chestWidth * 0.86,
-      chestHeight * 0.62,
-      c.chestDepth * 1.1,
-    );
-    plate.translate(0, chestHeight * 0.42, 0);
-    owned.push(plate);
-    const plateMesh = new THREE.Mesh(plate, WEBBING);
-    plateMesh.castShadow = true;
-    torso.add(plateMesh);
+    // Front and back plates over a carrier: a chunkier outline at the ribs.
+    shell(c.chestWidth + 0.05, c.waistWidth + 0.05, chestHeight * 0.56, chestHeight * 0.16, PLATE);
+    shell(c.chestWidth + 0.02, c.chestWidth + 0.02, 0.05, chestHeight * 0.72, WEBBING, 0.02);
   } else if (c.gear === 'vest') {
-    const vest = new THREE.CylinderGeometry(
-      c.chestWidth / 2 + 0.012,
-      c.waistWidth / 2 + 0.01,
-      chestHeight * 0.5,
-      14,
-      1,
+    // A short, close vest that stops above the waist, so the waist still reads.
+    shell(
+      c.chestWidth + 0.015,
+      c.waistWidth - 0.01,
+      chestHeight * 0.44,
+      chestHeight * 0.3,
+      WEBBING,
     );
-    vest.translate(0, chestHeight * 0.4, 0);
-    vest.scale(1, 1, c.chestDepth / c.chestWidth);
-    owned.push(vest);
-    const vestMesh = new THREE.Mesh(vest, WEBBING);
-    vestMesh.castShadow = true;
-    torso.add(vestMesh);
+    shell(c.chestWidth - 0.01, c.chestWidth - 0.01, 0.045, chestHeight * 0.74, PLATE, 0.008);
   } else {
-    // Jacket: a longer, looser shell that reaches past the hip.
-    const jacket = new THREE.CylinderGeometry(
-      c.chestWidth / 2 + 0.02,
-      c.hipWidth / 2 + 0.015,
-      chestHeight * 0.95,
-      14,
-      1,
+    // A jacket falls past the hip and flares, hiding the waist rather than
+    // following it - a different outline from the same body.
+    shell(
+      c.chestWidth + 0.03,
+      c.hipWidth + 0.02,
+      chestHeight * 0.92,
+      chestHeight * 0.04,
+      JACKET,
+      0.022,
     );
-    jacket.translate(0, chestHeight * 0.34, 0);
-    jacket.scale(1, 1, (c.chestDepth + 0.02) / c.chestWidth);
-    owned.push(jacket);
-    const jacketMesh = new THREE.Mesh(jacket, WEBBING);
-    jacketMesh.castShadow = true;
-    torso.add(jacketMesh);
+    shell(c.chestWidth * 0.66, c.chestWidth * 0.86, 0.07, chestHeight * 0.88, JACKET, 0.03);
   }
 
   // ---------------------------------------------------------------- head ---
@@ -356,10 +398,16 @@ export function buildFigure(c: CharacterDef, teamColor: number): Figure {
   //
   // Z rotations bring the elbows in against the body and angle the hands toward
   // the centreline, where a weapon would be.
-  armR.upper.rotation.set(0.28, 0, -0.3);
-  armR.fore.rotation.set(0.88, 0, -0.34);
-  armL.upper.rotation.set(0.35, 0, 0.34);
-  armL.fore.rotation.set(0.7, 0, 0.38);
+  // Aim rather than set angles: the hands have to finish in front of the chest,
+  // and a two-bone chain is far easier to point than to solve by eye.
+  root.updateMatrixWorld(true);
+  for (const [arm, side] of [
+    [armR, 1],
+    [armL, -1],
+  ] as const) {
+    aimLimb(arm.upper, aimScratch.set(CARRY_UPPER.x * side, CARRY_UPPER.y, CARRY_UPPER.z).clone());
+    aimLimb(arm.fore, aimScratch.set(CARRY_FORE.x * side, CARRY_FORE.y, CARRY_FORE.z).clone());
+  }
 
   // The weapon hangs off the leading hand.
   const grip = new THREE.Group();

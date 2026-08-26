@@ -96,7 +96,7 @@ const figures = CHARACTERS.map((character, index) => {
 // compared directly.
 const EMBEDDED = (globalThis as { __MODELS__?: Record<string, string> }).__MODELS__;
 
-const modelSlots = CHARACTERS.map((character, index) => {
+const modelSlots = CHARACTERS.filter((c) => c.modelUrl).map((character, index) => {
   const pivot = new THREE.Group();
   pivot.position.x = ((CHARACTERS.length - 1) / 2 + 1 + index) * SPACING;
   scene.add(pivot);
@@ -195,7 +195,7 @@ for (const slot of modelSlots) labels.append(slot.label);
 
 let yaw = 0.35;
 let pitch = 0.12;
-let distance = 7.2;
+let distance = Math.max(4.2, 2.6 + (figures.length + modelSlots.length) * 1.1);
 let dragging = false;
 let lastX = 0;
 let lastY = 0;
@@ -240,13 +240,11 @@ let framesDrawn = 0;
 
 // ------------------------------------------------------------------ loop ---
 
-// Centred on all four figures, not just the procedural three, or the
-// downloaded model sits exactly on the right edge of frame.
-const target = new THREE.Vector3(
-  ((CHARACTERS.length - 1) / 2 + CHARACTERS.length) * SPACING * 0.5,
-  0.95,
-  0,
-);
+// Centred on whatever is actually on stage: with no rigged models loaded, the
+// procedural figures alone should be in frame rather than off to one side.
+const stageLeft = figures[0]?.pivot.position.x ?? 0;
+const stageRight = (modelSlots.at(-1) ?? figures.at(-1))?.pivot.position.x ?? 0;
+const target = new THREE.Vector3((stageLeft + stageRight) / 2, 0.95, 0);
 const projected = new THREE.Vector3();
 let stride = 0;
 let last = performance.now();

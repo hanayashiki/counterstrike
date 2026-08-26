@@ -216,11 +216,13 @@ export class RemotePlayer {
     // backswing, which is what stops it looking like scissors.
     this.stride += speed * dt * 3.4;
     const gait = Math.min(1, speed / 6.5);
-    const swing = Math.sin(this.stride) * 0.72 * gait;
+    // 0.72 rad opens nearly a metre of stride on a 0.39 m thigh, which reads as
+    // a lunge rather than a walk.
+    const swing = Math.sin(this.stride) * 0.44 * gait;
     figure.thighL.rotation.x = swing;
     figure.thighR.rotation.x = -swing;
-    figure.shinL.rotation.x = -Math.max(0, -swing) * 1.25 - 0.05;
-    figure.shinR.rotation.x = -Math.max(0, swing) * 1.25 - 0.05;
+    figure.shinL.rotation.x = -Math.max(0, -swing) * 1.05 - 0.05;
+    figure.shinR.rotation.x = -Math.max(0, swing) * 1.05 - 0.05;
 
     figure.upperArmL.rotation.z = 0.34 - swing * 0.1;
     figure.upperArmR.rotation.z = -0.16 + swing * 0.1;

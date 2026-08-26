@@ -221,10 +221,11 @@ test('a match runs identically whatever models are in it', () => {
   );
 });
 
-test('every operator points at a rigged model, and the models are distinct', () => {
-  for (const c of CHARACTERS) {
-    assert.ok(c.modelUrl, `${c.name} has no model`);
-  }
-  const urls = CHARACTERS.map((c) => c.modelUrl);
-  assert.equal(new Set(urls).size, urls.length, 'two operators share one model');
+test('rigged models are optional, and any that are declared are distinct', () => {
+  // The figures are procedural again. A `modelUrl` is a per-character opt-in to
+  // a rigged asset, and two operators must never share one or they render
+  // identically — which is exactly what happened when both pointed at the same
+  // downloaded body.
+  const declared = CHARACTERS.map((c) => c.modelUrl).filter((url) => url !== undefined);
+  assert.equal(new Set(declared).size, declared.length, 'two operators share one model');
 });
