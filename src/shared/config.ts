@@ -108,6 +108,17 @@ export const TARGET_PLAYERS = 10;
 
 export const DEFAULT_PORT = 8787;
 
+/**
+ * Bot difficulty tiers, ordered weakest to strongest. Shared because the client
+ * both renders these names and sends the index back when a player changes the
+ * setting mid-match.
+ */
+export const BOT_SKILLS = ['easy', 'normal', 'hard', 'elite'] as const;
+export type BotSkillName = (typeof BOT_SKILLS)[number];
+
+export const botSkillFromIndex = (index: number): BotSkillName => BOT_SKILLS[index] ?? 'normal';
+export const botSkillIndex = (skill: BotSkillName): number => BOT_SKILLS.indexOf(skill);
+
 // ---------------------------------------------------------------------------
 // Input button bitmask
 // ---------------------------------------------------------------------------

@@ -11,6 +11,7 @@ import { test } from 'node:test';
 
 import { createBot } from '../src/game/bot';
 import { type BotSkill, GameWorld, TICK_MS, emptySnapshot } from '../src/game/world';
+import { BOT_SKILLS } from '../src/shared/config';
 import { EventKind } from '../src/shared/protocol';
 
 interface Result {
@@ -91,6 +92,61 @@ test('weak bots rarely land headshots', () => {
   assert.ok(easy.headshotPct < 25, `easy bots headshot ${easy.headshotPct.toFixed(0)}% of kills`);
   assert.ok(elite.headshotPct > 45, 'elite bots should be picking heads');
 });
+
+test('difficulty can be changed mid-match and actually takes effect', () => {
+  const world = new GameWorld({ targetPlayers: 10, botSkill: 'elite', seed: 4242 });
+  world.setBotFactory(createBot);
+  world.balanceBots();
+  for (let i = 0; i < 200; i++) world.step();
+
+  assert.equal(world.botSkill, 'elite');
+  assert.equal(world.matchState().botSkill, BOT_SKILLS.indexOf('elite'));
+
+  // Same roster, same ids - the change must not reshuffle the match.
+  const before = [...world.combatants.keys()].toSorted();
+  assert.equal(world.setBotSkill('easy'), true, 'a real change reports true');
+  assert.deepEqual([...world.combatants.keys()].toSorted(), before, 'roster changed');
+  assert.equal(world.botSkill, 'easy');
+  assert.equal(world.matchState().botSkill, BOT_SKILLS.indexOf('easy'));
+  assert.equal(world.matchStateDirty, true, 'clients must be told');
+
+  // Setting the same tier again is a no-op the server can skip broadcasting.
+  assert.equal(world.setBotSkill('easy'), false);
+
+  // And the bots genuinely behave like the new tier: run both a world that was
+  // built as easy and one switched to easy, and compare their lethality.
+  const switched = countKills(world, 45);
+  const born = countKills(freshWorld('easy'), 45);
+  assert.ok(
+    Math.abs(switched - born) < born * 0.6 + 6,
+    `switched-to-easy killed ${switched} vs ${born} for a world born easy`,
+  );
+  assert.ok(switched < 40, `bots switched to easy still killed ${switched} in 45 s`);
+});
+
+function freshWorld(skill: BotSkill): GameWorld {
+  const world = new GameWorld({ targetPlayers: 10, botSkill: skill, seed: 4242 });
+  world.setBotFactory(createBot);
+  world.balanceBots();
+  for (let i = 0; i < 200; i++) world.step();
+  return world;
+}
+
+function countKills(world: GameWorld, seconds: number): number {
+  const snapshot = emptySnapshot();
+  let kills = 0;
+  for (let i = 0; i < Math.round((seconds * 1000) / TICK_MS); i++) {
+    world.step();
+    if (i % 2 !== 0) continue;
+    const viewer = world.combatants.values().next().value;
+    if (viewer) {
+      world.buildSnapshot(viewer.id, snapshot);
+      for (const event of snapshot.events) if (event.kind === EventKind.Kill) kills++;
+    }
+    world.clearEvents();
+  }
+  return kills;
+}
 
 test('an unknown skill string is not silently accepted as a profile', () => {
   // The Durable Object validates BOT_SKILL against this set before use.

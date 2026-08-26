@@ -31,6 +31,7 @@ export interface InputCallbacks {
   onWeaponSlot(slot: number): void;
   onToggleScoreboard(open: boolean): void;
   onOpenChat(): void;
+  onOpenOptions(): void;
   onRespawnRequest(): void;
   onPointerLockChange(locked: boolean): void;
 }
@@ -143,6 +144,10 @@ export class InputController {
       case 'KeyT':
         event.preventDefault();
         this.callbacks.onOpenChat();
+        break;
+      case 'KeyO':
+        event.preventDefault();
+        this.callbacks.onOpenOptions();
         break;
       default:
         break;

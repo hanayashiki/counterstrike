@@ -14,7 +14,13 @@
 import { createBot } from '../game/bot';
 import { type BotSkill, GameWorld, TICK_MS, emptySnapshot } from '../game/world';
 import { BinaryReader, BinaryWriter, type Bytes } from '../shared/binary';
-import { MAX_PLAYERS, MAX_REWIND_MS, SNAPSHOT_RATE, TICK_RATE } from '../shared/config';
+import {
+  MAX_PLAYERS,
+  MAX_REWIND_MS,
+  SNAPSHOT_RATE,
+  TICK_RATE,
+  botSkillFromIndex,
+} from '../shared/config';
 import {
   MsgType,
   PROTOCOL_VERSION,
@@ -399,6 +405,16 @@ export class GameRoom implements DurableObject {
           world.respawn(combatant, true);
           world.dirtyRoster.add(combatant.id);
           world.balanceBots();
+        }
+        return;
+      }
+
+      case MsgType.SetBotSkill: {
+        if (!session.joined) return;
+        const skill = botSkillFromIndex(reader.u8());
+        if (world.setBotSkill(skill)) {
+          const who = world.combatants.get(session.playerId);
+          this.broadcast(encodeChatBroadcast(0, `${who?.name ?? 'someone'} set bots to ${skill}`));
         }
         return;
       }

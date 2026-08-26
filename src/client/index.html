@@ -96,6 +96,45 @@
         </div>
       </div>
 
+      <div id="roster">
+        <div class="roster-col" data-team="0">
+          <h4>Raiders</h4>
+          <ul id="roster-red"></ul>
+        </div>
+        <div class="roster-col" data-team="1">
+          <h4>Sentinels</h4>
+          <ul id="roster-blue"></ul>
+        </div>
+      </div>
+
+      <div id="pause" class="hidden">
+        <div class="pause-panel">
+          <h3>Paused</h3>
+          <p class="hint">Click anywhere to get back in.</p>
+
+          <div class="setting">
+            <span class="setting-label">Enemy skill</span>
+            <div class="choices" id="skill-choices">
+              <button type="button" data-value="0">Easy</button>
+              <button type="button" data-value="1">Normal</button>
+              <button type="button" data-value="2">Hard</button>
+              <button type="button" data-value="3">Elite</button>
+            </div>
+            <p class="setting-note" id="skill-note"></p>
+          </div>
+
+          <div class="setting">
+            <span class="setting-label">Team</span>
+            <div class="choices" id="team-choices">
+              <button type="button" data-value="0">Raiders</button>
+              <button type="button" data-value="1">Sentinels</button>
+            </div>
+          </div>
+
+          <button type="button" class="resume" id="resume">Resume</button>
+        </div>
+      </div>
+
       <div id="net-stats">
         <span id="fps">0 fps</span><span id="ping">0 ms</span><span id="tickinfo"></span>
       </div>
@@ -162,6 +201,7 @@
           <li><kbd>1</kbd>/<kbd>2</kbd> weapon</li>
           <li><kbd>Tab</kbd> scores</li>
           <li><kbd>Y</kbd> chat</li>
+          <li><kbd>O</kbd> options</li>
           <li><kbd>Esc</kbd> release mouse</li>
         </ul>
       </div>

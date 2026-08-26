@@ -6,7 +6,7 @@
 import { type BinaryReader, BinaryWriter, type Bytes } from './binary';
 import type { TeamId } from './map';
 
-export const PROTOCOL_VERSION = 4;
+export const PROTOCOL_VERSION = 5;
 
 export const enum MsgType {
   // client -> server
@@ -17,6 +17,7 @@ export const enum MsgType {
   RequestRespawn = 5,
   Ping = 6,
   SetTeam = 7,
+  SetBotSkill = 8,
 
   // server -> client
   Welcome = 64,
@@ -164,6 +165,8 @@ export interface MatchStateMsg {
   round: number;
   /** Player id that won the round MVP, or 0xffff for none. */
   mvp: number;
+  /** Index into BOT_SKILLS, so everyone sees the current difficulty. */
+  botSkill: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -501,7 +504,8 @@ export function encodeMatchState(m: MatchStateMsg): Bytes {
     .u16(m.scoreRed)
     .u16(m.scoreBlue)
     .u16(m.round)
-    .u16(m.mvp);
+    .u16(m.mvp)
+    .u8(m.botSkill);
   return w.finish();
 }
 
@@ -513,6 +517,7 @@ export function decodeMatchState(r: BinaryReader): MatchStateMsg {
     scoreBlue: r.u16(),
     round: r.u16(),
     mvp: r.u16(),
+    botSkill: r.u8(),
   };
 }
 

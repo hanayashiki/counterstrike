@@ -132,6 +132,10 @@ export class NetClient {
     this.send(encodeSimple(MsgType.SetTeam, team));
   }
 
+  setBotSkill(index: number): void {
+    this.send(encodeSimple(MsgType.SetBotSkill, index));
+  }
+
   sendChat(text: string): void {
     this.send(encodeChat(text));
   }

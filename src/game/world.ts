@@ -25,6 +25,7 @@ import {
   FALL_DAMAGE_THRESHOLD,
   HEAD_HEIGHT,
   INTERP_DELAY_MS,
+  type BotSkillName,
   MAX_HEALTH,
   MAX_REPEATED_INPUT_TICKS,
   MAX_REWIND_MS,
@@ -38,6 +39,7 @@ import {
   START_ARMOR,
   TICK_RATE,
   WARMUP_MS,
+  botSkillIndex,
 } from '../shared/config';
 import { GAME_MAP, TEAM_BLUE, TEAM_RED, type SpawnPoint, type TeamId } from '../shared/map';
 import { Rng, type Vec3, distance, forwardFromAngles, vec3 } from '../shared/math';
@@ -80,7 +82,7 @@ const ASSIST_DAMAGE = 40;
  */
 const HELD_BUTTONS = BTN_CROUCH | BTN_WALK | BTN_ADS | BTN_LEAN_LEFT | BTN_LEAN_RIGHT;
 
-export type BotSkill = 'easy' | 'normal' | 'hard' | 'elite';
+export type BotSkill = BotSkillName;
 
 export interface WorldOptions {
   targetPlayers: number;
@@ -150,6 +152,8 @@ export class GameWorld {
   private readonly rng: Rng;
   private readonly bots: BotBrain[] = [];
   private botFactory: BotFactory | null = null;
+  /** Seed each bot was built with, so a difficulty change can rebuild it. */
+  private readonly botSeeds = new Map<number, number>();
 
   constructor(readonly options: WorldOptions) {
     this.rng = new Rng(options.seed);
@@ -236,9 +240,34 @@ export class GameWorld {
     if (!this.combatants.delete(id)) return;
     this.privateEvents.delete(id);
     this.dirtyRoster.delete(id);
+    this.botSeeds.delete(id);
     const index = this.bots.findIndex((b) => b.combatant.id === id);
     if (index >= 0) this.bots.splice(index, 1);
     this.departed.push(id);
+  }
+
+  /**
+   * Change difficulty mid-match. Brains hold their profile from construction,
+   * so every bot is rebuilt on its original seed - they forget what they were
+   * chasing, which is a fair price for not having to make every profile field
+   * reactive.
+   */
+  setBotSkill(skill: BotSkill): boolean {
+    if (skill === this.options.botSkill) return false;
+    this.options.botSkill = skill;
+    const factory = this.botFactory;
+    if (factory) {
+      for (const [index, bot] of this.bots.entries()) {
+        const seed = this.botSeeds.get(bot.combatant.id) ?? bot.combatant.id;
+        this.bots[index] = factory(bot.combatant, skill, seed);
+      }
+    }
+    this.matchStateDirty = true;
+    return true;
+  }
+
+  get botSkill(): BotSkill {
+    return this.options.botSkill;
   }
 
   /** Drop or add bots so the match stays at the configured headcount. */
@@ -888,6 +917,7 @@ export class GameWorld {
       scoreBlue: this.scoreBlue,
       round: this.round,
       mvp: this.mvp,
+      botSkill: botSkillIndex(this.options.botSkill),
     };
   }
 }

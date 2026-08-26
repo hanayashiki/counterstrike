@@ -75,6 +75,17 @@ function wireChoices(containerId: string, initial: number): { value: number } {
 const teamChoice = wireChoices('menu-team', -1);
 const weaponChoice = wireChoices('menu-weapon', WeaponId.Rifle);
 
+/**
+ * What each tier actually does, in terms a player can act on. Measured over a
+ * headless ten-bot match, not adjectives.
+ */
+const SKILL_NOTES: readonly string[] = [
+  'Slow to notice you, slow to swing, and shooting about three metres wide at twenty paces. ~14 kills/min.',
+  'Reacts in a third of a second and sees you across half the map. ~37 kills/min.',
+  'Quick, accurate, and picks heads almost half the time. ~43 kills/min.',
+  'Near-instant reactions, sees the whole map, two thirds of its kills are headshots. ~57 kills/min.',
+];
+
 function serverUrl(room: string): string {
   const secure = globalThis.location.protocol === 'https:';
   const protocol = secure ? 'wss:' : 'ws:';
@@ -107,6 +118,7 @@ class Game {
     scoreBlue: 0,
     round: 1,
     mvp: 0xffff,
+    botSkill: 1,
   };
   private matchStateAt = 0;
 
@@ -158,7 +170,11 @@ class Game {
 
     this.input = new InputController(canvas, {
       onWeaponSlot: (slot) => this.net.selectWeapon(slot),
-      onToggleScoreboard: (open) => this.hud.toggleScoreboard(open),
+      onToggleScoreboard: (open) => {
+        // The full scoreboard supersedes the compact roster; showing both is noise.
+        this.hud.toggleScoreboard(open);
+        this.hud.setRosterVisible(!open);
+      },
       onOpenChat: () => {
         this.hud.openChat();
         this.input.setTextCapture(true);
@@ -170,7 +186,13 @@ class Game {
       onPointerLockChange: (locked) => {
         if (this.hud.chatOpen) return;
         this.input.setTextCapture(false);
-        if (!locked && this.running) this.hud.banner('Click to resume', 60_000);
+        // Losing the mouse is the only moment settings can be changed, so it
+        // doubles as the options screen rather than a bare "click to resume".
+        if (this.running) this.setPaused(!locked);
+      },
+      onOpenOptions: () => {
+        this.setPaused(true);
+        this.input.releaseLock();
       },
     });
 
@@ -182,6 +204,50 @@ class Game {
       }
       if (!this.input.pointerLocked) this.input.requestLock();
     });
+
+    this.wirePausePanel();
+  }
+
+  /** The in-game options panel: enemy skill and team, applied immediately. */
+  private wirePausePanel(): void {
+    const skills = document.getElementById('skill-choices') as HTMLElement;
+    for (const button of skills.querySelectorAll('button')) {
+      button.addEventListener('click', () => {
+        const index = Number(button.dataset.value);
+        this.net.setBotSkill(index);
+        // Reflect the choice at once; the server confirms via MatchState.
+        this.hud.setPaused(true, index, SKILL_NOTES[index] ?? '');
+      });
+    }
+
+    const teams = document.getElementById('team-choices') as HTMLElement;
+    for (const button of teams.querySelectorAll('button')) {
+      button.addEventListener('click', () => {
+        const team = Number(button.dataset.value) as TeamId;
+        this.net.setTeam(team);
+        this.hud.setPausedTeam(team);
+      });
+    }
+
+    const resume = document.getElementById('resume') as HTMLButtonElement;
+    resume.addEventListener('click', () => {
+      this.setPaused(false);
+      this.input.requestLock();
+    });
+
+    const overlay = document.getElementById('pause') as HTMLElement;
+    overlay.addEventListener('click', (event) => {
+      // Clicking the backdrop resumes; clicking inside the panel does not.
+      if (event.target === overlay) {
+        this.setPaused(false);
+        this.input.requestLock();
+      }
+    });
+  }
+
+  private setPaused(paused: boolean): void {
+    this.hud.setPaused(paused, this.match.botSkill, SKILL_NOTES[this.match.botSkill] ?? '');
+    if (paused) this.hud.setPausedTeam(this.myTeam);
   }
 
   async start(name: string, room: string, team: number, weapon: number): Promise<void> {
@@ -236,6 +302,9 @@ class Game {
     this.match = state;
     this.matchStateAt = performance.now();
     this.hud.setScores(state.scoreRed, state.scoreBlue);
+    if (this.hud.paused) {
+      this.hud.setPaused(true, state.botSkill, SKILL_NOTES[state.botSkill] ?? '');
+    }
     this.hud.setMatchState(state.phase, state.timeLeftMs, state.round);
     if (state.phase === MatchPhase.RoundEnd && previousPhase !== MatchPhase.RoundEnd) {
       const weWon =
@@ -522,6 +591,7 @@ class Game {
     }
 
     this.hud.renderScoreboard(this.roster.values(), this.myId, this.aliveIds);
+    this.hud.renderRoster(this.roster.values(), this.myId, this.aliveIds);
     this.hud.setNetStats(
       fps,
       this.net.rttMs,

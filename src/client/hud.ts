@@ -59,6 +59,11 @@ export class Hud {
   private readonly fps = el('fps');
   private readonly ping = el('ping');
   private readonly tickInfo = el('tickinfo');
+  private readonly roster = el('roster');
+  private readonly rosterRed = el<HTMLUListElement>('roster-red');
+  private readonly rosterBlue = el<HTMLUListElement>('roster-blue');
+  private readonly pause = el('pause');
+  private readonly skillNote = el('skill-note');
   private readonly chatForm = el<HTMLFormElement>('chat-input');
   private readonly chatField = this.chatForm.querySelector('input') as HTMLInputElement;
 
@@ -132,6 +137,61 @@ export class Hud {
   setScoped(scoped: boolean): void {
     this.scope.classList.toggle('hidden', !scoped);
     this.crosshair.classList.toggle('hidden', scoped);
+  }
+
+  /**
+   * The always-visible kill/death roster. Rebuilt from scratch each time rather
+   * than diffed: ten rows of text is nothing next to a frame of Three.js, and
+   * the alternative is a pile of node-reuse bugs.
+   */
+  renderRoster(players: Iterable<PlayerInfo>, myId: number, aliveIds: ReadonlySet<number>): void {
+    const byTeam: Record<TeamId, PlayerInfo[]> = { 0: [], 1: [] };
+    for (const player of players) byTeam[player.team].push(player);
+
+    for (const team of [0, 1] as TeamId[]) {
+      const list = team === 0 ? this.rosterRed : this.rosterBlue;
+      list.replaceChildren();
+      const sorted = byTeam[team].toSorted((a, b) => b.kills - a.kills || a.deaths - b.deaths);
+      for (const player of sorted) {
+        const row = document.createElement('li');
+        if (player.id === myId) row.className = 'me';
+        if (!aliveIds.has(player.id)) row.classList.add('down');
+
+        const who = document.createElement('span');
+        who.className = 'who';
+        who.textContent = player.name;
+
+        const kd = document.createElement('span');
+        kd.className = 'kd';
+        kd.textContent = `${player.kills}/${player.deaths}`;
+
+        row.append(who, kd);
+        list.append(row);
+      }
+    }
+  }
+
+  setRosterVisible(visible: boolean): void {
+    this.roster.classList.toggle('hidden', !visible);
+  }
+
+  /** Show or hide the pause panel, and mark which difficulty is live. */
+  setPaused(paused: boolean, skillIndex: number, skillNote: string): void {
+    this.pause.classList.toggle('hidden', !paused);
+    for (const button of this.pause.querySelectorAll<HTMLButtonElement>('#skill-choices button')) {
+      button.classList.toggle('active', Number(button.dataset.value) === skillIndex);
+    }
+    this.skillNote.textContent = skillNote;
+  }
+
+  setPausedTeam(team: TeamId): void {
+    for (const button of this.pause.querySelectorAll<HTMLButtonElement>('#team-choices button')) {
+      button.classList.toggle('active', Number(button.dataset.value) === team);
+    }
+  }
+
+  get paused(): boolean {
+    return !this.pause.classList.contains('hidden');
   }
 
   setScores(red: number, blue: number): void {

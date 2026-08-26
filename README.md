@@ -152,8 +152,11 @@ Each bot runs a small state machine (patrol → engage → hunt) over:
 
 ### Tuning them
 
-Set the tier with `BOT_SKILL` in `wrangler.jsonc` (`easy` / `normal` / `hard` /
-`elite`); `TARGET_PLAYERS` controls how full a room is kept. The tiers measure
+Difficulty is changeable **in game** — press `O`, or release the mouse with
+`Esc`, and pick a tier. The change applies to the whole room immediately (every
+bot brain is rebuilt on its original seed) and is announced to everyone.
+`BOT_SKILL` in `wrangler.jsonc` only sets what a fresh room starts on, and
+`TARGET_PLAYERS` controls how full a room is kept. The tiers measure
 out roughly like this over a 10-bot deathmatch:
 
 | tier | kills/min | headshot % of kills |
@@ -196,7 +199,9 @@ past 25 m. Weapons can declare a `burstSize`/`burstCycleMs`, applied identically
 by the server and by client prediction so the stall lands on the same frame in
 both. Armor absorbs 45% of
 non-leg damage. Headshots, assists, killfeed, damage direction indicators, fall
-damage, spawn protection.
+damage, spawn protection. A compact kill/death roster for every player sits on
+the left at all times; `Tab` swaps it for the full scoreboard with assists,
+score and ping.
 
 | | |
 | --- | --- |
@@ -205,7 +210,8 @@ damage, spawn protection.
 | `Q` / `E` | lean left / right |
 | `LMB` / `RMB` / `R` | fire / aim / reload |
 | `1` `2` | primary / sidearm |
-| `Tab` / `Y` / `Esc` | scoreboard / chat / release mouse |
+| `Tab` / `Y` | scoreboard / chat |
+| `O` / `Esc` | options / release mouse |
 
 The crosshair gap is the actual spread cone projected onto the screen, so it
 shows exactly where bullets can land.

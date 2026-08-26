@@ -121,12 +121,14 @@ test('welcome, player info, match state and ping/pong all roundtrip', () => {
         scoreBlue: 29,
         round: 3,
         mvp: 9,
+        botSkill: 2,
       }),
       MsgType.MatchState,
     ),
   );
   assert.equal(match.phase, MatchPhase.RoundEnd);
   assert.equal(match.timeLeftMs, 5500);
+  assert.equal(match.botSkill, 2, 'the live difficulty must reach the client');
 
   const ping = decodePing(readerFor(encodePing(999, 73), MsgType.Ping));
   assert.deepEqual(ping, { clientTimeMs: 999, measuredRttMs: 73 });
