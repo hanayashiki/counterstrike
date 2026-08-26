@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>cs_grid — operator models</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <canvas id="stage"></canvas>
+    <div id="ui">
+      <h1>Operator models</h1>
+      <p class="sub">Drag to orbit · scroll to zoom</p>
+      <div class="toggles">
+        <button type="button" data-toggle="spin" class="on">Turntable</button>
+        <button type="button" data-toggle="walk" class="on">Walk cycle</button>
+        <button type="button" data-toggle="hull">Hitbox</button>
+        <button type="button" data-toggle="team">Blue team</button>
+      </div>
+      <table id="specs"></table>
+    </div>
+    <div id="labels"></div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

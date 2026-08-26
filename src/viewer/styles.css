@@ -1,0 +1,182 @@
+/* The viewer commits to a single dark look: it is a lit 3D stage, and a light
+   theme would fight the render rather than complement it. */
+:root {
+  --ink: #0d151f;
+  --panel: rgba(13, 21, 31, 0.82);
+  --edge: rgba(255, 255, 255, 0.14);
+  --text: #e6edf6;
+  --dim: #93a3ba;
+  --faint: #6b7b91;
+  --accent: #ff6b4a;
+  --mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, monospace;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--ink);
+  color: var(--text);
+  font-family:
+    system-ui,
+    -apple-system,
+    'Segoe UI',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+#stage {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+  cursor: grab;
+}
+
+#stage:active {
+  cursor: grabbing;
+}
+
+#ui {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  width: 268px;
+  padding: 18px 20px 16px;
+  background: var(--panel);
+  border: 1px solid var(--edge);
+  border-radius: 12px;
+  backdrop-filter: blur(8px);
+}
+
+#ui h1 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+}
+
+#ui .sub {
+  margin: 3px 0 15px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+.toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 15px;
+}
+
+.toggles button {
+  flex: 1 1 45%;
+  padding: 7px 4px;
+  font: inherit;
+  font-size: 11.5px;
+  color: var(--dim);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--edge);
+  border-radius: 7px;
+  cursor: pointer;
+  transition:
+    color 120ms,
+    border-color 120ms,
+    background 120ms;
+}
+
+.toggles button:hover {
+  color: var(--text);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+.toggles button.on {
+  color: var(--text);
+  background: rgba(255, 107, 74, 0.16);
+  border-color: rgba(255, 107, 74, 0.6);
+}
+
+.toggles button:focus-visible {
+  outline: 2px solid #4aa8ff;
+  outline-offset: 2px;
+}
+
+#specs {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+#specs th {
+  text-align: right;
+  padding: 0 0 5px 8px;
+  font-weight: 500;
+  color: var(--faint);
+  letter-spacing: 0.06em;
+  border-bottom: 1px solid var(--edge);
+}
+
+#specs th:first-child {
+  text-align: left;
+}
+
+#specs td {
+  text-align: right;
+  padding: 4px 0 4px 8px;
+  color: var(--dim);
+}
+
+#specs td.nm {
+  text-align: left;
+  color: var(--text);
+}
+
+#labels {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.label {
+  position: absolute;
+  transform: translate(-50%, 14px);
+  text-align: center;
+  white-space: nowrap;
+  transition: opacity 160ms;
+}
+
+.label b {
+  display: block;
+  font-size: 13px;
+  letter-spacing: -0.01em;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.9);
+}
+
+.label span {
+  display: block;
+  margin-top: 1px;
+  font-family: var(--mono);
+  font-size: 9.5px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--faint);
+}
+
+@media (max-width: 640px) {
+  #ui {
+    width: calc(100% - 40px);
+  }
+}

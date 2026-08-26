@@ -21,7 +21,8 @@
     "fmt:check": "oxfmt --check .",
     "test": "node --import tsx --test \"tests/**/*.test.ts\"",
     "check": "npm run fmt:check && npm run lint && npm run typecheck && npm run test",
-    "prepare": "husky"
+    "prepare": "husky",
+    "viewer": "vite build --config vite.viewer.config.ts && node scripts/pack-viewer.mjs"
   },
   "dependencies": {
     "three": "^0.185.1"

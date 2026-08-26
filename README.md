@@ -267,6 +267,10 @@ rather than boxes, on an articulated skeleton so knees and elbows bend. Roughly
 | Kite | athletic | 1.08 | ponytail, light vest |
 | Wren | athletic | 1.07 | bun, hooded jacket |
 
+Run `npm run viewer` to build `dist/viewer/standalone.html`, a self-contained
+turntable of all three models — the same `buildFigure` the game calls, lit the
+same way, with a toggle that draws the shared collision hull over them.
+
 Shoulder-to-hip ratio is the strongest silhouette cue, so the builds are
 separated on that rather than on overall size; two operators sharing a build are
 told apart by hair and worn kit, which changes an outline as much as the body
