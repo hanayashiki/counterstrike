@@ -74,6 +74,7 @@ function wireChoices(containerId: string, initial: number): { value: number } {
 
 const teamChoice = wireChoices('menu-team', -1);
 const weaponChoice = wireChoices('menu-weapon', WeaponId.Rifle);
+const characterChoice = wireChoices('menu-character', 1);
 
 /**
  * What each tier actually does, in terms a player can act on. Measured over a
@@ -250,9 +251,15 @@ class Game {
     if (paused) this.hud.setPausedTeam(this.myTeam);
   }
 
-  async start(name: string, room: string, team: number, weapon: number): Promise<void> {
+  async start(
+    name: string,
+    room: string,
+    team: number,
+    weapon: number,
+    character: number,
+  ): Promise<void> {
     await this.audio.init();
-    await this.net.connect(serverUrl(room), { name, team, weapon });
+    await this.net.connect(serverUrl(room), { name, team, weapon, character });
     this.running = true;
     this.lastFrameMs = performance.now();
     menu.classList.add('hidden');
@@ -286,6 +293,7 @@ class Game {
 
   private onPlayerInfo(info: PlayerInfo): void {
     this.roster.set(info.id, info);
+    this.players.setCharacter(info.id, info.character);
     if (info.id === this.myId) this.myTeam = info.team;
   }
 
@@ -615,7 +623,7 @@ playButton.addEventListener('click', async () => {
 
   try {
     game ??= new Game();
-    await game.start(name, room, teamChoice.value, weaponChoice.value);
+    await game.start(name, room, teamChoice.value, weaponChoice.value, characterChoice.value);
     menuStatus.textContent = '';
   } catch (error) {
     menuStatus.textContent = error instanceof Error ? error.message : 'connection failed';

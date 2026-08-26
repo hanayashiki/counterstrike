@@ -229,6 +229,15 @@ speed and is disabled in mid-air.
 scope overlay once you aim, rather than holding the weapon in front of the
 camera — otherwise the scope body would sit in the middle of the screen.
 
+**Operators.** Three character models, picked at the menu — Bulwark (heavy
+build), Kite (athletic, ponytail) and Wren (athletic, bun) — built from the same
+procedural boxes as everything else. They are strictly cosmetic: every operator
+is simulated inside the identical hull, and `tests/characters.test.ts` asserts
+that no model exceeds it, that the models sit close enough together that the
+lean ones are not measurably harder to hit, and that a whole match plays out
+byte-identically whichever is equipped. Cosmetic randomness draws from its own
+RNG stream so that adding a visual choice cannot shift gameplay rolls.
+
 ## Tooling
 
 [oxlint](https://oxc.rs) and [oxfmt](https://oxc.rs) — the Rust-based linter and

@@ -1,3 +1,4 @@
+import { CHARACTER_COUNT, characterForId } from '../shared/characters';
 import {
   type Brush,
   type MoveResult,
@@ -150,6 +151,13 @@ export class GameWorld {
 
   private nextId = 1;
   private readonly rng: Rng;
+  /**
+   * Cosmetic choices draw from their own stream. Sharing the gameplay RNG would
+   * mean that adding a purely visual decision shifts every subsequent roll -
+   * spread, spawn choice, bot loadout - and silently moves the numbers that
+   * seeded regression tests measure.
+   */
+  private readonly cosmeticRng: Rng;
   private readonly bots: BotBrain[] = [];
   private botFactory: BotFactory | null = null;
   /** Seed each bot was built with, so a difficulty change can rebuild it. */
@@ -157,6 +165,7 @@ export class GameWorld {
 
   constructor(readonly options: WorldOptions) {
     this.rng = new Rng(options.seed);
+    this.cosmeticRng = new Rng((options.seed ^ 0x5eed_c05e) >>> 0);
     this.nav = NavGraph.build(this.map);
   }
 
@@ -203,7 +212,13 @@ export class GameWorld {
     return redScore <= blueScore ? TEAM_RED : TEAM_BLUE;
   }
 
-  addPlayer(name: string, isBot: boolean, preferredTeam: number, weapon: WeaponId): Combatant {
+  addPlayer(
+    name: string,
+    isBot: boolean,
+    preferredTeam: number,
+    weapon: WeaponId,
+    character = -1,
+  ): Combatant {
     const id = this.nextId++;
     const team: TeamId =
       preferredTeam === TEAM_RED || preferredTeam === TEAM_BLUE
@@ -212,6 +227,8 @@ export class GameWorld {
     const finalName =
       name.trim().slice(0, 20) || (isBot ? pickBotName(this.takenNames()) : `Player ${id}`);
     const combatant = new Combatant(id, finalName, team, isBot);
+    combatant.character =
+      character >= 0 && character < CHARACTER_COUNT ? character : characterForId(id);
     combatant.setLoadout(weapon);
     this.combatants.set(id, combatant);
     this.dirtyRoster.add(id);
@@ -229,7 +246,13 @@ export class GameWorld {
       WeaponId.Sniper,
       WeaponId.Shotgun,
     ]);
-    const combatant = this.addPlayer(pickBotName(this.takenNames()), true, -1, loadout);
+    const combatant = this.addPlayer(
+      pickBotName(this.takenNames()),
+      true,
+      -1,
+      loadout,
+      this.cosmeticRng.int(CHARACTER_COUNT),
+    );
     this.bots.push(
       this.botFactory(combatant, skill, (this.rng.int(0x7fffffff) ^ combatant.id) >>> 0),
     );
@@ -906,6 +929,7 @@ export class GameWorld {
       assists: c.assists,
       score: c.score,
       pingMs: Math.round(c.pingMs),
+      character: c.character,
     };
   }
 

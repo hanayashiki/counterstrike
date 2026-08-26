@@ -1,10 +1,20 @@
-/** Bot call-signs, deliberately human-looking so the scoreboard reads naturally. */
+/**
+ * Bot call-signs, deliberately human-looking so the scoreboard reads naturally.
+ * Names are not tied to a character model - any operator can carry any name.
+ */
 export const BOT_NAMES: readonly string[] = [
+  'Vesper',
+  'Juno',
+  'Nyx',
+  'Astra',
+  'Lyra',
+  'Cyra',
+  'Wren',
+  'Kestrel',
   'Ghost',
   'Vandal',
   'Nomad',
   'Ripcord',
-  'Kestrel',
   'Havoc',
   'Sable',
   'Torque',

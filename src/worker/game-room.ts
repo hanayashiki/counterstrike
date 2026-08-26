@@ -346,7 +346,13 @@ export class GameRoom implements DurableObject {
         }
         const weapon =
           join.weapon >= 0 && join.weapon < WEAPON_COUNT ? join.weapon : WeaponId.Rifle;
-        const combatant = world.addPlayer(sanitizeText(join.name), false, join.team, weapon);
+        const combatant = world.addPlayer(
+          sanitizeText(join.name),
+          false,
+          join.team,
+          weapon,
+          join.character,
+        );
         session.playerId = combatant.id;
         session.joined = true;
         world.balanceBots();

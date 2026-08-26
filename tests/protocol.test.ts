@@ -38,16 +38,17 @@ const readerFor = (bytes: Uint8Array, expected: MsgType): BinaryReader => {
 };
 
 test('join roundtrips and truncates over-long names', () => {
-  const r = readerFor(encodeJoin('a'.repeat(60), 1, 2), MsgType.Join);
+  const r = readerFor(encodeJoin('a'.repeat(60), 1, 2, 2), MsgType.Join);
   const join = decodeJoin(r);
   assert.equal(join.version, PROTOCOL_VERSION);
   assert.equal(join.name.length, 24);
   assert.equal(join.team, 1);
   assert.equal(join.weapon, 2);
+  assert.equal(join.character, 2);
 });
 
 test('join preserves an auto-team request', () => {
-  const join = decodeJoin(readerFor(encodeJoin('x', -1, 0), MsgType.Join));
+  const join = decodeJoin(readerFor(encodeJoin('x', -1, 0, 0), MsgType.Join));
   assert.equal(join.team, -1);
 });
 
@@ -104,6 +105,7 @@ test('welcome, player info, match state and ping/pong all roundtrip', () => {
         assists: 3,
         score: -5,
         pingMs: 84,
+        character: 2,
       }),
       MsgType.PlayerInfo,
     ),
@@ -111,6 +113,7 @@ test('welcome, player info, match state and ping/pong all roundtrip', () => {
   assert.equal(info.name, 'Ghost');
   assert.equal(info.isBot, true);
   assert.equal(info.score, -5, 'negative scores must survive as signed');
+  assert.equal(info.character, 2, 'the chosen model must reach other clients');
 
   const match = decodeMatchState(
     readerFor(

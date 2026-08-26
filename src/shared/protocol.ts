@@ -6,7 +6,7 @@
 import { type BinaryReader, BinaryWriter, type Bytes } from './binary';
 import type { TeamId } from './map';
 
-export const PROTOCOL_VERSION = 5;
+export const PROTOCOL_VERSION = 6;
 
 export const enum MsgType {
   // client -> server
@@ -155,6 +155,8 @@ export interface PlayerInfo {
   assists: number;
   score: number;
   pingMs: number;
+  /** Which model to draw for this player. Cosmetic only. */
+  character: number;
 }
 
 export interface MatchStateMsg {
@@ -173,9 +175,14 @@ export interface MatchStateMsg {
 // Client -> server
 // ---------------------------------------------------------------------------
 
-export function encodeJoin(name: string, team: number, weapon: number): Bytes {
+export function encodeJoin(name: string, team: number, weapon: number, character: number): Bytes {
   const w = new BinaryWriter(64);
-  w.u8(MsgType.Join).u16(PROTOCOL_VERSION).string(name.slice(0, 24)).i8(team).u8(weapon);
+  w.u8(MsgType.Join)
+    .u16(PROTOCOL_VERSION)
+    .string(name.slice(0, 24))
+    .i8(team)
+    .u8(weapon)
+    .u8(character);
   return w.finish();
 }
 
@@ -184,10 +191,17 @@ export interface JoinMsg {
   name: string;
   team: number;
   weapon: number;
+  character: number;
 }
 
 export function decodeJoin(r: BinaryReader): JoinMsg {
-  return { version: r.u16(), name: r.string(), team: r.i8(), weapon: r.u8() };
+  return {
+    version: r.u16(),
+    name: r.string(),
+    team: r.i8(),
+    weapon: r.u8(),
+    character: r.u8(),
+  };
 }
 
 const MOVE_SCALE = 127;
@@ -478,7 +492,8 @@ export function encodePlayerInfo(p: PlayerInfo): Bytes {
     .u16(p.deaths)
     .u16(p.assists)
     .i32(p.score)
-    .u16(Math.min(65535, p.pingMs));
+    .u16(Math.min(65535, p.pingMs))
+    .u8(p.character);
   return w.finish();
 }
 
@@ -493,6 +508,7 @@ export function decodePlayerInfo(r: BinaryReader): PlayerInfo {
     assists: r.u16(),
     score: r.i32(),
     pingMs: r.u16(),
+    character: r.u8(),
   };
 }
 

@@ -92,7 +92,7 @@ socket.on('error', (error: Error) => {
 });
 
 socket.on('open', () => {
-  socket.send(encodeJoin('smoke-bot', -1, WeaponId.Rifle));
+  socket.send(encodeJoin('smoke-bot', -1, WeaponId.Rifle, 1));
   socket.send(encodePing(Date.now() >>> 0, 0));
 
   const started = Date.now();

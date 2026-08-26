@@ -77,6 +77,9 @@ export class Combatant {
   firingUntilMs = 0;
   wantsAds = false;
 
+  /** Cosmetic model. Never consulted by the simulation. */
+  character = 0;
+
   kills = 0;
   deaths = 0;
   assists = 0;

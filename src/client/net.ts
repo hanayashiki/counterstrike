@@ -27,6 +27,7 @@ export interface JoinOptions {
   name: string;
   team: number;
   weapon: number;
+  character: number;
 }
 
 export interface NetHandlers {
@@ -69,7 +70,7 @@ export class NetClient {
 
       socket.addEventListener('open', () => {
         this.connected = true;
-        socket.send(encodeJoin(join.name, join.team, join.weapon));
+        socket.send(encodeJoin(join.name, join.team, join.weapon, join.character));
         this.pingTimer = setInterval(() => this.sendPing(), PING_INTERVAL_MS);
         this.sendPing();
         settled = true;
