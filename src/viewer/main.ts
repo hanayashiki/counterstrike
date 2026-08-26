@@ -8,6 +8,7 @@
 import * as THREE from 'three';
 
 import { buildFigure } from '../client/render/figure';
+import { type ModelInstance, instantiate, loadModel } from '../client/render/model';
 import { CHARACTERS, headHeight, shoulderHipRatio } from '../shared/characters';
 import { PLAYER_HEIGHT, PLAYER_RADIUS } from '../shared/config';
 import { TEAM_COLORS } from '../shared/map';
@@ -59,6 +60,8 @@ scene.add(grid);
 // --------------------------------------------------------------- figures ---
 
 const SPACING = 1.35;
+const MODEL_URL =
+  (globalThis as { __MODEL_URL__?: string }).__MODEL_URL__ ?? '/models/CesiumMan.glb';
 const figures = CHARACTERS.map((character, index) => {
   const pivot = new THREE.Group();
   pivot.position.x = (index - (CHARACTERS.length - 1) / 2) * SPACING;
@@ -83,6 +86,27 @@ const figures = CHARACTERS.map((character, index) => {
 
   return { character, pivot, figure, hull };
 });
+
+// The downloaded rigged model, stood beside the procedural figures so the two
+// approaches can be compared directly.
+let modelInstance: ModelInstance | null = null;
+const modelPivot = new THREE.Group();
+modelPivot.position.x = ((CHARACTERS.length - 1) / 2 + 1) * SPACING;
+scene.add(modelPivot);
+
+const modelLabel = document.createElement('div');
+modelLabel.className = 'label';
+modelLabel.innerHTML = '<b>CesiumMan</b><span>downloaded · rigged</span>';
+
+void (async () => {
+  const loaded = await loadModel(MODEL_URL);
+  if (!loaded) {
+    modelLabel.innerHTML = '<b>no model</b><span>asset unavailable</span>';
+    return;
+  }
+  modelInstance = instantiate(loaded, TEAM_COLORS[0]);
+  modelPivot.add(modelInstance.root);
+})();
 
 // ------------------------------------------------------------------- ui ----
 
@@ -122,6 +146,7 @@ const labelNodes = figures.map(({ character }) => {
   labels.append(node);
   return node;
 });
+labels.append(modelLabel);
 
 // -------------------------------------------------------------- controls ---
 
@@ -198,7 +223,9 @@ function frame(now: number): void {
 
   if (state.spin) {
     for (const { pivot } of figures) pivot.rotation.y += dt * 0.55;
+    modelPivot.rotation.y += dt * 0.55;
   }
+  modelInstance?.update(dt, state.walk ? 5.2 : 0);
 
   camera.position.set(
     target.x + Math.sin(yaw) * Math.cos(pitch) * distance,
@@ -208,6 +235,11 @@ function frame(now: number): void {
   camera.lookAt(target);
 
   // Keep the name plates pinned under each figure.
+  projected.set(modelPivot.position.x, 0, 0).project(camera);
+  modelLabel.style.left = `${((projected.x + 1) / 2) * globalThis.innerWidth}px`;
+  modelLabel.style.top = `${((-projected.y + 1) / 2) * globalThis.innerHeight}px`;
+  modelLabel.style.opacity = projected.z < 1 ? '1' : '0';
+
   for (const [index, { pivot }] of figures.entries()) {
     projected.set(pivot.position.x, 0, 0).project(camera);
     const node = labelNodes[index] as HTMLElement;

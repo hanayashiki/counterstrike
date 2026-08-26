@@ -255,7 +255,22 @@ speed and is disabled in mid-air.
 scope overlay once you aim, rather than holding the weapon in front of the
 camera — otherwise the scope body would sit in the middle of the screen.
 
-**Operators.** Three character models, picked at the menu, built to real human
+**Operators.** Rigged glTF models are loaded when present, with the procedural
+figure as the fallback — a character with no `modelUrl`, or whose asset fails to
+fetch, still renders, because the project has always been able to run with no
+art assets at all. Models are normalised on load: scaled to exactly
+`PLAYER_HEIGHT` and shifted so the feet sit at the origin, so an asset arriving
+at 1.51 m does not need the rest of the renderer to know.
+
+The bundled model is [CesiumMan](https://github.com/KhronosGroup/glTF-Sample-Assets),
+© 2017 Cesium, [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/) — a
+Khronos sample asset, and a placeholder rather than a final character: it is one
+generic figure, so every operator currently looks the same. Dropping a
+multi-body-type pack such as [Quaternius' CC0 Universal Base Characters](https://quaternius.com/packs/universalbasecharacters.html)
+into `src/client/public/models/` and pointing each character's `modelUrl` at it
+needs no code change.
+
+**Procedural fallback.** Three figures built to real human
 landmark proportions — crotch at 49% of height, knee at 27%, shoulder at 81%,
 seven and a half heads tall — from tapered cylinders with spheres at the joints
 rather than boxes, on an articulated skeleton so knees and elbows bend. Roughly
@@ -268,8 +283,9 @@ rather than boxes, on an articulated skeleton so knees and elbows bend. Roughly
 | Wren | athletic | 1.07 | bun, hooded jacket |
 
 Run `npm run viewer` to build `dist/viewer/standalone.html`, a self-contained
-turntable of all three models — the same `buildFigure` the game calls, lit the
-same way, with a toggle that draws the shared collision hull over them.
+turntable of the procedural figures and the rigged model side by side — the same
+code the game calls, lit the same way, with a toggle that draws the shared
+collision hull over them.
 
 Shoulder-to-hip ratio is the strongest silhouette cue, so the builds are
 separated on that rather than on overall size; two operators sharing a build are

@@ -56,6 +56,13 @@ export interface CharacterDef {
 
   readonly hair: Hair;
   readonly gear: Gear;
+
+  /**
+   * Rigged model to draw instead of the procedural figure. Optional: a
+   * character without one, or whose asset fails to load, falls back to
+   * `buildFigure`, so the game still runs with no art assets present.
+   */
+  readonly modelUrl?: string;
 }
 
 export const CHARACTERS: readonly CharacterDef[] = [
@@ -86,6 +93,7 @@ export const CHARACTERS: readonly CharacterDef[] = [
     deltoidRadius: 0.075,
     hair: 'crop',
     gear: 'plate',
+    modelUrl: '/models/CesiumMan.glb',
   },
   {
     id: 1,
@@ -114,6 +122,7 @@ export const CHARACTERS: readonly CharacterDef[] = [
     deltoidRadius: 0.058,
     hair: 'ponytail',
     gear: 'vest',
+    modelUrl: '/models/CesiumMan.glb',
   },
   {
     id: 2,
@@ -141,6 +150,7 @@ export const CHARACTERS: readonly CharacterDef[] = [
     deltoidRadius: 0.056,
     hair: 'bun',
     gear: 'jacket',
+    modelUrl: '/models/CesiumMan.glb',
   },
 ];
 
@@ -170,3 +180,8 @@ export const headHeight = (c: CharacterDef): number => c.headRadius * 2 * SKULL_
 
 /** Shoulder-to-hip ratio: above 1.2 reads as a heavy build, near 1.1 as lean. */
 export const shoulderHipRatio = (c: CharacterDef): number => c.shoulderSpan / c.hipWidth;
+
+/** Every distinct rigged model referenced by a character, for preloading. */
+export const MODEL_URLS: readonly string[] = [
+  ...new Set(CHARACTERS.map((c) => c.modelUrl).filter((url): url is string => !!url)),
+];

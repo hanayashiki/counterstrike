@@ -4,7 +4,8 @@ const SERVER_PORT = Number(process.env.GAME_SERVER_PORT ?? 8787);
 
 export default defineConfig({
   root: 'src/client',
-  publicDir: false,
+  // Rigged character models and their licences are served as static assets.
+  publicDir: 'public',
   build: {
     outDir: '../../dist/client',
     emptyOutDir: true,

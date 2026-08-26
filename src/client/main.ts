@@ -12,6 +12,7 @@
  */
 import * as THREE from 'three';
 
+import { MODEL_URLS } from '../shared/characters';
 import {
   BTN_ADS,
   EYE_OFFSET,
@@ -42,6 +43,7 @@ import { InputController } from './input';
 import { NetClient } from './net';
 import { LocalPlayer } from './prediction';
 import { EffectsSystem } from './render/effects';
+import { preloadModels } from './render/model';
 import { PlayerManager } from './render/players';
 import { DEFAULT_FOV, RenderContext } from './render/scene';
 import { Viewmodel } from './render/viewmodel';
@@ -286,6 +288,9 @@ class Game {
     character: number,
   ): Promise<void> {
     await this.audio.init();
+    // Rigged models are loaded before the match so nobody pops in mid-fight.
+    // preloadModels never rejects; a failure just leaves the procedural figure.
+    await preloadModels(MODEL_URLS);
     await this.net.connect(serverUrl(room), { name, team, weapon, character });
     this.running = true;
     this.lastFrameMs = performance.now();
@@ -664,7 +669,7 @@ let game: Game | null = null;
 playButton.addEventListener('click', async () => {
   playButton.disabled = true;
   menuStatus.classList.remove('error');
-  menuStatus.textContent = 'Connecting…';
+  menuStatus.textContent = 'Loading models…';
 
   const name = nameField.value.trim() || `Operator ${Math.floor(Math.random() * 900 + 100)}`;
   const room = roomField.value.trim() || 'lobby';

@@ -24,6 +24,16 @@ const body = html
 
 const styles = readFileSync('src/viewer/styles.css', 'utf8');
 
+// An Artifact cannot make any network request, so the model travels inline.
+let modelGlobal = '';
+try {
+  const glb = readFileSync('src/client/public/models/CesiumMan.glb');
+  modelGlobal = `<script>globalThis.__MODEL_URL__ = "data:model/gltf-binary;base64,${glb.toString('base64')}";</script>\n`;
+  console.log(`inlined model: ${(glb.length / 1024).toFixed(0)} KB`);
+} catch {
+  console.log('no model to inline; the viewer will show procedural figures only');
+}
+
 const page = `<title>cs_grid — operator models</title>
 
 <style>
@@ -31,7 +41,7 @@ ${styles}</style>
 
 ${body}
 
-<script type="module">
+${modelGlobal}<script type="module">
 ${js}
 </script>
 `;

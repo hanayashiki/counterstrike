@@ -21,6 +21,7 @@ import { wrapAngle } from '../../shared/math';
 import { type EntitySnapshot, PF_ALIVE, PF_CROUCH, PF_TEAM_BLUE } from '../../shared/protocol';
 import { getWeapon } from '../../shared/weapons';
 import { type Figure, buildFigure } from './figure';
+import { type ModelInstance, instantiate, peekModel } from './model';
 import { cloneWeaponModel } from './weapon-model';
 
 interface Sample {
@@ -40,7 +41,9 @@ const BUFFER_LIMIT = 24;
 
 export class RemotePlayer {
   readonly root = new THREE.Group();
-  private readonly figure: Figure;
+  /** Exactly one of these is used; the model wins when its asset is loaded. */
+  private readonly figure: Figure | null = null;
+  private readonly model: ModelInstance | null = null;
   private weaponRoot: THREE.Group | null = null;
   private weaponId = -1;
 
@@ -62,15 +65,23 @@ export class RemotePlayer {
   ) {
     this.team = team;
     this.character = getCharacter(characterId);
-    this.figure = buildFigure(this.character, TEAM_COLORS[team]);
-    this.root.add(this.figure.root);
+
+    const loaded = this.character.modelUrl ? peekModel(this.character.modelUrl) : null;
+    if (loaded) {
+      this.model = instantiate(loaded, TEAM_COLORS[team]);
+      this.root.add(this.model.root);
+    } else {
+      this.figure = buildFigure(this.character, TEAM_COLORS[team]);
+      this.root.add(this.figure.root);
+    }
     scene.add(this.root);
   }
 
   setTeam(team: TeamId): void {
     if (this.team === team) return;
     this.team = team;
-    for (const material of this.figure.teamMaterials) {
+    this.model?.setTeamColor(TEAM_COLORS[team]);
+    for (const material of this.figure?.teamMaterials ?? []) {
       material.color.setHex(TEAM_COLORS[team]);
       material.emissive.setHex(TEAM_COLORS[team]).multiplyScalar(0.15);
     }
@@ -79,16 +90,25 @@ export class RemotePlayer {
   private setWeapon(weaponId: number): void {
     if (this.weaponId === weaponId) return;
     this.weaponId = weaponId;
+    const grip = this.figure?.grip;
     if (this.weaponRoot) {
-      this.figure.grip.remove(this.weaponRoot);
+      this.weaponRoot.removeFromParent();
       this.weaponRoot = null;
     }
+    // Rigged models have no grip node the engine knows about, so their weapon
+    // is carried on the body rather than in the hand until a model ships with
+    // a named hand bone to attach to.
     const model = cloneWeaponModel(getWeapon(weaponId));
-    // Sat in the hand, then rotated so the barrel points where the figure faces.
-    model.root.position.set(0, -0.02, -0.12);
-    model.root.rotation.set(1.62, 0, 0);
+    if (grip) {
+      model.root.position.set(0, -0.02, -0.12);
+      model.root.rotation.set(1.62, 0, 0);
+      grip.add(model.root);
+    } else {
+      model.root.position.set(0.16, 1.16, -0.26);
+      model.root.rotation.set(0, 0, 0);
+      this.root.add(model.root);
+    }
     this.weaponRoot = model.root;
-    this.figure.grip.add(model.root);
   }
 
   push(entity: EntitySnapshot, time: number): void {
@@ -157,26 +177,35 @@ export class RemotePlayer {
     this.root.position.set(x, y, z);
     this.root.rotation.y = yaw;
 
-    const figure = this.figure;
+    const speed = Math.hypot(x - this.lastX, z - this.lastZ) / Math.max(dt, 1e-3);
+    this.lastX = x;
+    this.lastZ = z;
 
-    // Crouching squashes the whole figure toward the reported hull height,
-    // which keeps the model inside the hitbox the server is using.
+    // Crouching squashes the avatar toward the reported hull height, which
+    // keeps whatever is drawn inside the hitbox the server is using.
     const scale = height / PLAYER_HEIGHT;
+
+    if (this.model) {
+      this.model.root.scale.y = scale;
+      this.model.root.position.x = lean * LEAN_DISTANCE;
+      this.model.root.rotation.z = -lean * LEAN_ROLL * 1.7;
+      this.model.update(dt, speed);
+      return;
+    }
+
+    const figure = this.figure;
+    if (!figure) return;
+
     figure.root.scale.y = scale;
 
     // Lean slides the torso out past the feet and rolls it, so a peeking
     // opponent shows exactly the sliver of body their own camera bought them.
     figure.torso.position.x = lean * LEAN_DISTANCE;
-    figure.torso.position.z = 0;
     figure.torso.rotation.z = -lean * LEAN_ROLL * 1.7;
 
     // The upper body carries the aim; the head adds a little more.
     figure.torso.rotation.x = -pitch * 0.35;
     figure.head.rotation.x = -pitch * 0.5;
-
-    const speed = Math.hypot(x - this.lastX, z - this.lastZ) / Math.max(dt, 1e-3);
-    this.lastX = x;
-    this.lastZ = z;
 
     // Walk cycle. Thighs swing out of phase and the knee only bends on the
     // backswing, which is what stops it looking like scissors.
@@ -188,11 +217,9 @@ export class RemotePlayer {
     figure.shinL.rotation.x = -Math.max(0, -swing) * 1.25 - 0.05;
     figure.shinR.rotation.x = -Math.max(0, swing) * 1.25 - 0.05;
 
-    // Arms counter-rotate a little, but stay on the weapon.
     figure.upperArmL.rotation.z = 0.34 - swing * 0.1;
     figure.upperArmR.rotation.z = -0.16 + swing * 0.1;
 
-    // A running figure bobs and rolls slightly.
     figure.root.position.y = -Math.abs(Math.sin(this.stride)) * 0.035 * gait;
     figure.torso.rotation.y = Math.sin(this.stride) * 0.07 * gait;
 
@@ -206,7 +233,8 @@ export class RemotePlayer {
 
   dispose(): void {
     this.scene.remove(this.root);
-    this.figure.dispose();
+    this.figure?.dispose();
+    this.model?.dispose();
   }
 }
 
